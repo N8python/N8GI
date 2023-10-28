@@ -8,6 +8,7 @@ import { EffectShader } from "./EffectShader.js";
 import { PoissionBlur } from "./PoissionBlur.js";
 import { OrbitControls } from 'https://unpkg.com/three@0.155.0/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.155.0/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'https://unpkg.com/three@0.155.0/examples/jsm/loaders/DRACOLoader.js';
 import { GUI } from 'https://unpkg.com/three@0.155.0/examples/jsm/libs/lil-gui.module.min.js';
 import { FullScreenQuad } from "https://unpkg.com/three/examples/jsm/postprocessing/Pass.js";
 import { VerticalBlurShader } from './VerticalBlurShader.js';
@@ -61,8 +62,11 @@ async function main() {
     directionalLight.shadow.bias = -0.01;
 
     scene.add(directionalLight);
-
-    const sponza = (await new GLTFLoader().loadAsync('./sponza.glb')).scene;
+    const loader = new GLTFLoader();
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath("./draco/");
+    loader.setDRACOLoader(dracoLoader);
+    const sponza = (await loader.loadAsync('./sponza_cd.glb')).scene;
     const tKnot = new THREE.Mesh(
         new THREE.TorusKnotGeometry(5, 1.5, 200, 32),
         new THREE.MeshStandardMaterial({
