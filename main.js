@@ -660,16 +660,18 @@ async function main() {
         };
         float dot2( in vec3 v ) { return dot(v,v); }
 float maxcomp( in vec2 v ) { return max(v.x,v.y); }
-        vec4 sample1Dim( sampler2D s, int index, int size ) {
-            int y = index / size;
-            int x = index - y * size;
-            return texelFetch(s, ivec2(x, y), 0);
-        }
-        ivec4 sample1Dim( highp isampler2D s, int index, int size ) {
-            int y = index / size;
-            int x = index - y * size;
-            return texelFetch(s, ivec2(x, y), 0);
-        }
+precision highp isampler2D;
+
+vec4 sample1Dim( sampler2D s, int index, int size ) {
+    int y = index / size;
+    int x = index - y * size;
+    return texelFetch(s, ivec2(x, y), 0);
+}
+ivec4 sample1Dimi( isampler2D s, int index, int size ) {
+    int y = index / size;
+    int x = index - y * size;
+    return texelFetch(s, ivec2(x, y), 0);
+}
         vec3 closestTriangle( in vec3 v0, in vec3 v1, in vec3 v2, in vec3 p )
     {
         vec3 v10 = v1 - v0; vec3 p0 = p - v0;
@@ -740,7 +742,7 @@ float maxcomp( in vec2 v ) { return max(v.x,v.y); }
            if (sampledIndex < 0) {
                 gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
             } else {
-                int meshIndex = sample1Dim(meshIndexTex, sampledIndex, posSize).r;
+                int meshIndex = sample1Dimi(meshIndexTex, sampledIndex, posSize).r;
                 mat4 worldMatrix = worldMatrices[meshIndex];
                 // Compute normal matrix by normalizing the rotation part of the world matrix
                 mat3 normalMatrix = transpose(mat3(inverse(worldMatrix)));
