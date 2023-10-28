@@ -660,12 +660,12 @@ async function main() {
         };
         float dot2( in vec3 v ) { return dot(v,v); }
 float maxcomp( in vec2 v ) { return max(v.x,v.y); }
-        vec4 sample1D( sampler2D s, int index, int size ) {
+        vec4 sample1Dim( sampler2D s, int index, int size ) {
             int y = index / size;
             int x = index - y * size;
             return texelFetch(s, ivec2(x, y), 0);
         }
-        ivec4 sample1D( highp isampler2D s, int index, int size ) {
+        ivec4 sample1Dim( highp isampler2D s, int index, int size ) {
             int y = index / size;
             int x = index - y * size;
             return texelFetch(s, ivec2(x, y), 0);
@@ -740,30 +740,30 @@ float maxcomp( in vec2 v ) { return max(v.x,v.y); }
            if (sampledIndex < 0) {
                 gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
             } else {
-                int meshIndex = sample1D(meshIndexTex, sampledIndex, posSize).r;
+                int meshIndex = sample1Dim(meshIndexTex, sampledIndex, posSize).r;
                 mat4 worldMatrix = worldMatrices[meshIndex];
                 // Compute normal matrix by normalizing the rotation part of the world matrix
                 mat3 normalMatrix = transpose(mat3(inverse(worldMatrix)));
-               vec3 posA =(worldMatrix * vec4(sample1D(posTex, sampledIndex * 3, posSize).xyz, 1.0)).xyz;
-                vec3 posB = (worldMatrix * vec4(sample1D(posTex, sampledIndex * 3 + 1, posSize).xyz, 1.0)).xyz;
-                vec3 posC = (worldMatrix * vec4(sample1D(posTex, sampledIndex * 3 + 2, posSize).xyz, 1.0)).xyz;
+               vec3 posA =(worldMatrix * vec4(sample1Dim(posTex, sampledIndex * 3, posSize).xyz, 1.0)).xyz;
+                vec3 posB = (worldMatrix * vec4(sample1Dim(posTex, sampledIndex * 3 + 1, posSize).xyz, 1.0)).xyz;
+                vec3 posC = (worldMatrix * vec4(sample1Dim(posTex, sampledIndex * 3 + 2, posSize).xyz, 1.0)).xyz;
                 // Get barycoords 
                 vec3 worldPos = closestTriangle(posA, posB, posC, toWorldSpace(vec3(voxelX, voxelY, voxelZ) + vec3(0.5)));
                 vec3 baryCoords = bary(posA, posB, posC, worldPos);
 
                 // Get normals
-                vec3 normalA = normalMatrix * sample1D(normalTex, sampledIndex * 3, posSize).xyz;
-                vec3 normalB = normalMatrix * sample1D(normalTex, sampledIndex * 3 + 1, posSize).xyz;
-                vec4 normalCInitial = sample1D(normalTex, sampledIndex * 3 + 2, posSize);
+                vec3 normalA = normalMatrix * sample1Dim(normalTex, sampledIndex * 3, posSize).xyz;
+                vec3 normalB = normalMatrix * sample1Dim(normalTex, sampledIndex * 3 + 1, posSize).xyz;
+                vec4 normalCInitial = sample1Dim(normalTex, sampledIndex * 3 + 2, posSize);
                 vec3 normalC = normalMatrix * normalCInitial.xyz;
                 int materialIndex = int(normalCInitial.w);
                 vec3 interpolatedNormal = normalize(normalA * baryCoords.x + normalB * baryCoords.y + normalC * baryCoords.z);
                 if (dot(-interpolatedNormal, directionalLights[0].direction) > dot(interpolatedNormal, directionalLights[0].direction)) {
                     interpolatedNormal = -interpolatedNormal;
                 }
-                vec2 uvA = sample1D(uvTex, sampledIndex * 3, posSize).xy;
-                vec2 uvB = sample1D(uvTex, sampledIndex * 3 + 1, posSize).xy;
-                vec2 uvC = sample1D(uvTex, sampledIndex * 3 + 2, posSize).xy;
+                vec2 uvA = sample1Dim(uvTex, sampledIndex * 3, posSize).xy;
+                vec2 uvB = sample1Dim(uvTex, sampledIndex * 3 + 1, posSize).xy;
+                vec2 uvC = sample1Dim(uvTex, sampledIndex * 3 + 2, posSize).xy;
                 vec2 interpolatedUV = uvA * baryCoords.x + uvB * baryCoords.y + uvC * baryCoords.z;
 
                
