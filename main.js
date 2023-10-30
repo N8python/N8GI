@@ -966,9 +966,6 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         workers.push(worker);
     }
     voxelColorShader.material.uniforms["mapAtlas"].value = mapAtlas;
-    const _mat3 = new THREE.Matrix3();
-    const gl = renderer.getContext();
-    const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 
     function checkTimerQuery(timerQuery, gl) {
         const available = gl.getQueryParameter(timerQuery, gl.QUERY_RESULT_AVAILABLE);
@@ -993,14 +990,12 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         }
     });
     async function updateVoxels() {
-        console.time("full voxelization");
         // voxelBuffer.fill(0);
         indexArray.fill(-1);
         // Put all the sponza indices into the index buffer
         // const children = [];
 
         let posBufferCount = 0;
-        console.time("mesh transformation");
         for (let i = 0; i < childrenToVoxelize.length; i++) {
             const child = childrenToVoxelize[i];
             child.updateMatrixWorld();
@@ -1031,9 +1026,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
             }
         }
         meshData.needsUpdate = true;
-        console.timeEnd("mesh transformation");
 
-        console.time("mesh voxelization");
         const posArray = posBufferAux.slice(0, posBufferCount);
 
 
@@ -1062,18 +1055,10 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         }));
 
         await Promise.all(promises);
-        console.timeEnd("mesh voxelization")
         indexTex.needsUpdate = true;
-        console.time("uploading to gpu");
-        const query = gl.createQuery();
-        gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
         renderer.setRenderTarget(voxelRenderTarget);
         renderer.clear();
-        gl.endQuery(ext.TIME_ELAPSED_EXT);
-        checkTimerQuery(query, gl);
         voxelColorShader.render(renderer);
-        console.timeEnd("uploading to gpu");
-        console.timeEnd("full voxelization");
         // scene.add(instancedVoxelMesh);
         requestAnimationFrame(updateVoxels);
     }
