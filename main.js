@@ -18,7 +18,6 @@ async function main() {
     // Setup basic renderer, controls, and profiler
     const clientWidth = window.innerWidth;
     const clientHeight = window.innerHeight;
-    console.log(clientWidth, clientHeight);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, clientWidth / clientHeight, 0.1, 1000);
     camera.position.set(50, 75, 50);
@@ -71,6 +70,7 @@ async function main() {
         new THREE.TorusKnotGeometry(5, 1.5, 200, 32),
         new THREE.MeshStandardMaterial({
             emissive: new THREE.Color(1, 1, 0),
+            color: new THREE.Color(0, 0, 0),
             metalness: 0.0,
             roughness: 1.0
         })
@@ -85,6 +85,7 @@ async function main() {
         new THREE.TorusKnotGeometry(5, 1.5, 200, 32),
         new THREE.MeshStandardMaterial({
             emissive: new THREE.Color(1, 0, 1),
+            color: new THREE.Color(0, 0, 0),
             metalness: 0.0,
             roughness: 1.0
         })
@@ -99,6 +100,7 @@ async function main() {
         new THREE.TorusKnotGeometry(5, 1.5, 200, 32),
         new THREE.MeshStandardMaterial({
             emissive: new THREE.Color(1, 0, 0),
+            color: new THREE.Color(0, 0, 0),
             metalness: 0.0,
             roughness: 1.0
         })
@@ -112,7 +114,7 @@ async function main() {
     const tKnot4 = new THREE.Mesh(
         new THREE.TorusKnotGeometry(5, 1.5, 200, 32),
         new THREE.MeshStandardMaterial({
-            emissive: new THREE.Color(0, 0, 1),
+            color: new THREE.Color(0, 0, 1),
             metalness: 0.0,
             roughness: 1.0
         })
@@ -140,7 +142,6 @@ async function main() {
     const center = box.getCenter(new THREE.Vector3());
 
     const VOXEL_AMOUNT = size.clone().multiplyScalar(0.5).floor(); //.addScalar(2);
-    //console.log(vo)
     const indexArray = new Int32Array(new SharedArrayBuffer(VOXEL_AMOUNT.z * VOXEL_AMOUNT.y * VOXEL_AMOUNT.x * 4));
     const voxelRenderTargetSize = Math.ceil(Math.sqrt(VOXEL_AMOUNT.z * VOXEL_AMOUNT.y * VOXEL_AMOUNT.x));
     const voxelRenderTarget = new THREE.WebGLRenderTarget(voxelRenderTargetSize, voxelRenderTargetSize, {
@@ -201,34 +202,40 @@ async function main() {
             child.materialIndex = materials.indexOf(child.material);
         }
     });
-    let maps = [];
+    let maps = [
+        await new THREE.TextureLoader().loadAsync('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdj+P///38ACfsD/QVDRcoAAAAASUVORK5CYII='),
+    ];
     for (let i = 0; i < materials.length; i++) {
         if (materials[i].map) {
             maps.push(materials[i].map);
             materials[i].mapIndex = maps.length - 1;
         } else {
-            materials[i].mapIndex = -1;
+            materials[i].mapIndex = 0;
         }
     }
-    let materialInfo = [];
+    const packRGBToUint32 = (v) => {
+        const r = Math.floor(v.x * 255.0);
+        const g = Math.floor(v.y * 255.0);
+        const b = Math.floor(v.z * 255.0);
+        return (r << 16) | (g << 8) | b;
+    };
+    const materialInfoBuffer = new Uint32Array(materials.length * 4);
+
     for (let i = 0; i < materials.length; i++) {
-        materialInfo.push({
-            metalness: materials[i].metalness,
-            roughness: materials[i].roughness,
-            emissive: new THREE.Vector3(materials[i].emissive.r, materials[i].emissive.g, materials[i].emissive.b),
-            mapIndex: materials[i].mapIndex,
-            color: new THREE.Vector3(materials[i].color.r, materials[i].color.g, materials[i].color.b)
-        });
+
+        // Pack emissive into the material info buffer
+        materialInfoBuffer[i * 4] = packRGBToUint32(new THREE.Vector3(materials[i].emissive.r, materials[i].emissive.g, materials[i].emissive.b));
+        materialInfoBuffer[i * 4 + 1] = packRGBToUint32(new THREE.Vector3(materials[i].color.r, materials[i].color.g, materials[i].color.b));
+        materialInfoBuffer[i * 4 + 2] = packRGBToUint32(new THREE.Vector3(materials[i].metalness, materials[i].roughness, 0.0));
+        materialInfoBuffer[i * 4 + 3] = materials[i].mapIndex;
     }
-    while (materialInfo.length < 64) {
-        materialInfo.push({
-            metalness: 0.0,
-            roughness: 0.0,
-            mapIndex: -1,
-            color: new THREE.Vector3(1.0, 1.0, 1.0),
-            emissive: new THREE.Vector3(0.0, 0.0, 0.0)
-        });
-    }
+    const materialDataTexture = new THREE.DataTexture(materialInfoBuffer, materials.length, 1);
+    materialDataTexture.minFilter = THREE.NearestFilter;
+    materialDataTexture.maxFilter = THREE.NearestFilter;
+    materialDataTexture.format = THREE.RGBAIntegerFormat;
+    materialDataTexture.type = THREE.UnsignedIntType;
+    materialDataTexture.internalFormat = "RGBA32UI";
+    materialDataTexture.needsUpdate = true;
     // Convert maps to actual pixel data
     const TARGET_SIZE_X = 1024;
     const TARGET_SIZE_Y = 1024;
@@ -259,7 +266,7 @@ async function main() {
     const children = [];
     scene.traverse((child) => {
         if (child.isMesh && child.geometry.index) {
-            child.updateMatrixWorld();
+            child.updateMatrixWorld(true);
             children.push(child);
         }
     });
@@ -274,6 +281,7 @@ async function main() {
         const indices = child.geometry.index.array;
         const normals = child.geometry.attributes.normal.array;
         const iLen = indices.length;
+        child.meshIndex = i;
         for (let j = 0; j < iLen; j++) {
             const i = indices[j];
             posBufferTex[posCount++] = positions[i * 3];
@@ -284,7 +292,8 @@ async function main() {
             uvAuxBuffer[uvCount++] = uvs[i * 2 + 1];
             uvAuxBuffer[uvCount++] = 0.0;
             uvAuxBuffer[uvCount++] = 0.0;
-            meshIndexBuffer[indexCount++] = i;
+            meshIndexBuffer[indexCount++] = child.meshIndex;
+
 
             normalAuxBuffer[normalCount++] = normals[i * 3];
             normalAuxBuffer[normalCount++] = normals[i * 3 + 1];
@@ -292,13 +301,11 @@ async function main() {
             normalAuxBuffer[normalCount++] = child.materialIndex;
 
         }
-        child.meshIndex = i;
     }
     posTex.needsUpdate = true;
     normalTex.needsUpdate = true;
     uvTex.needsUpdate = true;
     meshIndexTex.needsUpdate = true;
-    const MAX_MESHES = 1024;
     const uniformsCapture = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.ShaderMaterial({
         lights: true,
         uniforms: {
@@ -318,6 +325,9 @@ async function main() {
         `
     }));
     scene.add(uniformsCapture);
+    const meshMatrixData = new Float32Array(children.length * 4 * 4);
+    const meshMatrixTex = new THREE.DataTexture(meshMatrixData, 4, children.length, THREE.RGBAFormat, THREE.FloatType);
+    meshMatrixTex.needsUpdate = true;
     const voxelColorShader = new FullScreenQuad(new THREE.ShaderMaterial({
         lights: false,
         uniforms: {
@@ -334,8 +344,9 @@ async function main() {
             mapAtlas: { value: null },
             environment: { value: environment },
             meshIndexTex: { value: meshIndexTex },
-            materials: { value: null },
             mapSize: { value: TARGET_SIZE_X },
+            materialDataTexture: { value: materialDataTexture },
+            meshMatrixTex: { value: meshMatrixTex },
             time: { value: 0.0 }
         },
         vertexShader: /*glsl*/ `
@@ -636,6 +647,8 @@ async function main() {
         uniform highp sampler2D normalTex;
         uniform highp sampler2D uvTex;
         uniform highp isampler2D meshIndexTex;
+        uniform highp usampler2D materialDataTexture;
+        uniform highp sampler2D meshMatrixTex;
         uniform highp samplerCube environment;
         uniform int textureSize;
         uniform int posSize;
@@ -645,19 +658,6 @@ async function main() {
         uniform vec3 boxCenter;
         uniform vec3 boxSize;
         varying vec2 vUv;
-        struct MaterialInfo {
-            float metalness;
-            float roughness;
-            float mapIndex;
-            vec3 emissive;
-            vec3 color;
-        };
-        #define MAX_MATERIALS 64
-        uniform MaterialInfo materials[MAX_MATERIALS];
-        #define MAX_MESHES ${MAX_MESHES}
-        uniform MeshData {
-            mat4 worldMatrices[MAX_MESHES];
-        };
         float dot2( in vec3 v ) { return dot(v,v); }
 float maxcomp( in vec2 v ) { return max(v.x,v.y); }
 precision highp isampler2D;
@@ -694,10 +694,6 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     vec3 bary( in vec3 v0, in vec3 v1, in vec3 v2, in vec3 p ) {
         vec3 normal = cross(v1 - v0, v2 - v0);
         float area = dot(cross(v1 - v0, v2 - v0), normal);
-	
-        if(abs(area) < 0.0001) {
-            return vec3(0.0, 0.0, 0.0);
-        }
         
         vec3 pv0 = v0 - p;
         vec3 pv1 = v1 - p;
@@ -733,6 +729,24 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         
         return packedFloat;
     }
+    float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
+    }
+    
+    vec3 randomColor(float seed) {
+        float r = hash(seed);
+        float g = hash(seed + 1.0);
+        float b = hash(seed + 2.0);
+        return vec3(r, g, b);
+    }
+    vec3 unpackRGB(uint rgb) {
+        return vec3(
+            float((rgb >> 16) & 0xFFu) / 255.0,
+            float((rgb >> 8) & 0xFFu) / 255.0,
+            float(rgb & 0xFFu) / 255.0
+        );
+    }
+
         void main() {
             int index = int(gl_FragCoord.y) * textureSize + int(gl_FragCoord.x);
             int voxelZ = index / (VOXEL_AMOUNT.x * VOXEL_AMOUNT.y);
@@ -742,13 +756,24 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
            if (sampledIndex < 0) {
                 gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
             } else {
-                int meshIndex = sample1Dimi(meshIndexTex, sampledIndex, posSize).r;
-                mat4 worldMatrix = worldMatrices[meshIndex];
+                int meshIndex = sample1Dimi(meshIndexTex, sampledIndex * 3, posSize).r;
+                mat4 worldMatrix;
+                   worldMatrix = (mat4(
+                        texelFetch(meshMatrixTex, ivec2(0, meshIndex), 0),
+                        texelFetch(meshMatrixTex, ivec2(1, meshIndex), 0),
+                        texelFetch(meshMatrixTex, ivec2(2, meshIndex), 0),
+                        texelFetch(meshMatrixTex, ivec2(3, meshIndex), 0)
+                    )) ;
+                  //  worldMatrix =  [meshIndex];
+                
+                // Get y rotation of world matrix
+
+
                 // Compute normal matrix by normalizing the rotation part of the world matrix
                 mat3 normalMatrix = transpose(mat3(inverse(worldMatrix)));
                vec3 posA =(worldMatrix * vec4(sample1Dim(posTex, sampledIndex * 3, posSize).xyz, 1.0)).xyz;
-                vec3 posB = (worldMatrix * vec4(sample1Dim(posTex, sampledIndex * 3 + 1, posSize).xyz, 1.0)).xyz;
-                vec3 posC = (worldMatrix * vec4(sample1Dim(posTex, sampledIndex * 3 + 2, posSize).xyz, 1.0)).xyz;
+                vec3 posB = (worldMatrix *  vec4(sample1Dim(posTex, sampledIndex * 3 + 1, posSize).xyz, 1.0)).xyz;
+                vec3 posC = (worldMatrix *  vec4(sample1Dim(posTex, sampledIndex * 3 + 2, posSize).xyz, 1.0)).xyz;
                 // Get barycoords 
                 vec3 worldPos = closestTriangle(posA, posB, posC, toWorldSpace(vec3(voxelX, voxelY, voxelZ) + vec3(0.5)));
                 vec3 baryCoords = bary(posA, posB, posC, worldPos);
@@ -760,7 +785,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                 vec3 normalC = normalMatrix * normalCInitial.xyz;
                 int materialIndex = int(normalCInitial.w);
                 vec3 interpolatedNormal = normalize(normalA * baryCoords.x + normalB * baryCoords.y + normalC * baryCoords.z);
-                if (dot(-interpolatedNormal, directionalLights[0].direction) > dot(interpolatedNormal, directionalLights[0].direction)) {
+               if (dot(-interpolatedNormal, directionalLights[0].direction) > dot(interpolatedNormal, directionalLights[0].direction)) {
                     interpolatedNormal = -interpolatedNormal;
                 }
                 vec2 uvA = sample1Dim(uvTex, sampledIndex * 3, posSize).xy;
@@ -785,15 +810,18 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
 
                 // Get texture
                 vec2 uv = vec2(interpolatedUV.x, interpolatedUV.y);
-                float metalness = materials[materialIndex].metalness;
-                float roughness = materials[materialIndex].roughness;
-                float mapIndex = materials[materialIndex].mapIndex;
-                vec3 color = materials[materialIndex].color;
-                vec3 emissive = materials[materialIndex].emissive;
-                vec4 sampledTexel = vec4(1.0);
-                if (mapIndex >= 0.0) {
-                    sampledTexel = textureLod(mapAtlas, vec3(uv, mapIndex), mipLevel);
-                }
+                uvec4 materialData = texelFetch(materialDataTexture, ivec2(materialIndex, 0), 0);
+                vec3 mrn = unpackRGB(materialData.b);
+                float metalness = mrn.r;
+                float roughness = mrn.g;
+                float mapIndex = float(materialData.w);
+                vec3 color = unpackRGB(
+                    materialData.g
+                );
+                vec3 emissive = unpackRGB(
+                    materialData.r
+                );//materials[materialIndex].emissive;
+                vec4 sampledTexel = textureLod(mapAtlas, vec3(uv, mapIndex), mipLevel);
                 vec3 accumulatedLight = vec3(0.0);
                 vec3 accumulatedLightBack = vec3(0.0);
                 #pragma unroll_loop_start
@@ -819,11 +847,15 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                 accumulatedLightBack += emissive;
 
 
-
+                vec3 center =                     (posA + posB + posC) / 3.0;
                 gl_FragColor =
                 vec4(
-                    packThreeBytes(accumulatedLight),
-                    packThreeBytes(accumulatedLightBack),
+                   packThreeBytes(vec3(
+                    accumulatedLight //randomColor(100.0*float(meshIndex))
+                   )),
+                   packThreeBytes(vec3(
+                    accumulatedLightBack //randomColor(100.0*float(meshIndex))
+                   )),
                     packThreeBytes(interpolatedNormal * 0.5 + 0.5)
                     , 
                     1.0);
@@ -834,13 +866,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         }
         `
     }));
-    const meshData = new THREE.UniformsGroup();
-    meshData.setName("MeshData");
-    const meshMatrixArray = Array(MAX_MESHES).fill(new THREE.Matrix4());
-    meshData.add(new THREE.Uniform(meshMatrixArray));
 
-    voxelColorShader.material.uniformsGroups = [meshData];
-    voxelColorShader.material.uniforms["materials"].value = materialInfo;
 
 
 
@@ -967,42 +993,20 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     }
     voxelColorShader.material.uniforms["mapAtlas"].value = mapAtlas;
 
-    function checkTimerQuery(timerQuery, gl) {
-        const available = gl.getQueryParameter(timerQuery, gl.QUERY_RESULT_AVAILABLE);
-        if (available) {
-            const elapsedTimeInNs = gl.getQueryParameter(timerQuery, gl.QUERY_RESULT);
-            const elapsedTimeInMs = elapsedTimeInNs / 1000000;
-            console.log("voxel colorization (gpu): " + elapsedTimeInMs + " ms");
-        } else {
-            // If the result is not available yet, check again after a delay
-            setTimeout(() => {
-                checkTimerQuery(timerQuery, gl);
-            }, 1);
-        }
-    }
 
-
-    const childrenToVoxelize = [];
-    scene.traverse((child) => {
-        if (child.isMesh && child.geometry.index) {
-            child.updateMatrixWorld();
-            childrenToVoxelize.push(child);
-        }
-    });
     async function updateVoxels() {
         // voxelBuffer.fill(0);
         indexArray.fill(-1);
         // Put all the sponza indices into the index buffer
         // const children = [];
-
         let posBufferCount = 0;
-        for (let i = 0; i < childrenToVoxelize.length; i++) {
-            const child = childrenToVoxelize[i];
-            child.updateMatrixWorld();
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            child.updateMatrixWorld(true);
             const indices = child.geometry.index.array;
             const posArray = child.geometry.attributes.position.array;
             const transform = child.matrixWorld;
-            meshMatrixArray[child.meshIndex].copy(transform);
+            transform.toArray(meshMatrixData, child.meshIndex * 16);
             const [
                 e0, e1, e2, e3,
                 e4, e5, e6, e7,
@@ -1025,7 +1029,6 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                 posBufferAux[posBufferCount++] = 1.0;
             }
         }
-        meshData.needsUpdate = true;
 
         const posArray = posBufferAux.slice(0, posBufferCount);
 
@@ -1033,7 +1036,6 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
 
         const pLen = posArray.length;
         const workerIndexLength = Math.ceil(pLen / workerCount / 12) * 12;
-
         const promises = workers.map((worker, i) => new Promise((resolve, reject) => {
             worker.onmessage = (e) => {
                 resolve();
@@ -1056,6 +1058,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
 
         await Promise.all(promises);
         indexTex.needsUpdate = true;
+        meshMatrixTex.needsUpdate = true;
         renderer.setRenderTarget(voxelRenderTarget);
         renderer.clear();
         voxelColorShader.render(renderer);
@@ -1101,10 +1104,9 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     gui.add(effectController, "giOnly");
     gui.add(effectController, "denoiseStrength", 0.0, 1.0);
     gui.add(effectController, "giStrength", 0.0, 5.0);
-    // gui.add(effectController, "roughness", 0.0, 1.0);
+    gui.add(effectController, "roughness", 0.0, 1.0);
 
     function animate() {
-
         tKnot.rotation.y += 0.01;
         tKnot.rotation.x += 0.01;
         tKnot.position.x = Math.sin(performance.now() / 1000) * 75;
@@ -1144,7 +1146,6 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
 
         const uniforms = uniformsCapture.material.uniforms;
         uniforms.directionalLights.value.forEach(light => {
-            /*console.log(light.direction);*/
             light.direction.applyMatrix4(new THREE.Matrix4().extractRotation(
                 camera.matrixWorld
             ));
