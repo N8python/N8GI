@@ -21,10 +21,12 @@ async function main() {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, clientWidth / clientHeight, 0.1, 1000);
     camera.position.set(50, 75, 50);
+
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(clientWidth, clientHeight);
     document.body.appendChild(renderer.domElement);
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.autoUpdate = false;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 25, 0);
@@ -1117,6 +1119,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         tKnot3.rotation.x += 0.01;
         tKnot4.rotation.y += 0.01;
         tKnot4.rotation.x += 0.01;
+
         directionalLight.position.set(
             60 * Math.cos(performance.now() / 1000), //Math.sin(performance.now() / 1000) * 50,
             200,
@@ -1139,7 +1142,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         renderer.render(scene, camera);
         directionalLight.intensity = ogIntensity;
         albedoLight.intensity = 0.0;
-
+        renderer.shadowMap.needsUpdate = true;
         renderer.setRenderTarget(defaultTexture);
         renderer.clear();
         renderer.render(scene, camera);
