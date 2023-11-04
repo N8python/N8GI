@@ -62,7 +62,6 @@ const EffectShader = {
       highp vec3 direction;
     };
     struct RayHit {
-      highp vec3 pos;
       highp vec3 normal;
       highp ivec3 voxelPos;
       bool hit;
@@ -95,33 +94,30 @@ const EffectShader = {
   }
   RayHit voxelCast(vec3 startPos, Ray ray, float dist) {
     vec3 deltaDist = abs(vec3(length(ray.direction)) / ray.direction);
-    vec3 rayStep = vec3(sign(ray.direction));
-    vec3 voxelPos = floor(startPos);
-    vec3 sideDist = (sign(ray.direction) * (voxelPos - startPos) + (sign(ray.direction) * 0.5) + 0.5) * deltaDist;
+    ivec3 rayStep = ivec3(sign(ray.direction));
+    ivec3 voxelPos = ivec3(floor(startPos));
+    vec3 sideDist = (sign(ray.direction) * (vec3(voxelPos) - startPos) + (sign(ray.direction) * 0.5) + 0.5) * deltaDist;
     bvec3 mask;
     vec3 cushion = 1.0 / voxelAmount;
     vec3 invVoxelAmount = 1.0 / voxelAmount;
     bool hit = false;
-    vec3 samplePoint;
-    vec3 minBound = -cushion;
-    vec3 maxBound = 1.0 + cushion;
+    ivec3 minBound = ivec3(0);
+    ivec3 maxBound = ivec3(voxelAmount) - 1;
     int maxSteps = int(ceil(dist * 2.0));
     for(int i = 0; i < maxSteps; i++) {
-      samplePoint = voxelPos * invVoxelAmount;
       int voxel = texelFetch(voxelTexture, 
-        ivec3(voxelPos), 0
+        (voxelPos), 0
         ).r;
       if(voxel >= 0) {
         hit = true;
         break;
-      } else if (any(lessThan(samplePoint, minBound)) || any(greaterThan(samplePoint, maxBound))) {
+      } else if (any(lessThan(voxelPos, minBound)) || any(greaterThan(voxelPos, maxBound))) {
         hit = false;
         break;
       }
-      
       mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
       sideDist += vec3(mask) * deltaDist;
-      voxelPos += vec3(mask) * rayStep;
+      voxelPos += ivec3(mask) * rayStep;
     }
     if (hit) {
 
@@ -134,9 +130,9 @@ const EffectShader = {
           normal = vec3(0.0, 0.0, -sign(rayStep.z));
         }
       
-        return RayHit(samplePoint, normal, ivec3(voxelPos), true);
+        return RayHit(normal, (voxelPos), true);
       } else {
-      return RayHit(vec3(-1.0), vec3(-1.0), ivec3(-1), false);
+      return RayHit(vec3(-1.0), ivec3(-1), false);
       }
   }
   vec3 toVoxelSpace(vec3 pos) {
@@ -276,20 +272,10 @@ vec3 unpackThreeBytes(float packedFloat) {
       RayHit hit = raycast(ray);
       vec3 reflectedColor = vec3(0.0);
       if (hit.hit) {
-        /*reflectedColor = unpackThreeBytes(getVoxelColor(
-          hit.voxelPos
-        ).r).rgb;*/
         vec3 voxData = getVoxelColor(hit.voxelPos);
         vec3 voxNormal = 2.0 * unpackThreeBytes(voxData.b) - 1.0;
         vec3 color = unpackThreeBytes(voxData.r).rgb;
         vec3 backColor = unpackThreeBytes(voxData.g).rgb;
-       /* if (
-          dot(voxNormal, -ray.direction) > 0.0
-        ) {
-          reflectedColor = voxNormal;
-        } else {
-          reflectedColor = vec3(1.0);
-        }*/
         reflectedColor = dot(voxNormal, -ray.direction) > 0.0 ? color : backColor;
       //  reflectedColor = color;
 
