@@ -108,16 +108,17 @@ const EffectShader = {
       int voxel = texelFetch(voxelTexture, 
         (voxelPos), 0
         ).r;
-      if(voxel >= 0) {
+       if (voxel >= 0) {
         hit = true;
         break;
-      } else if (any(lessThan(voxelPos, minBound)) || any(greaterThan(voxelPos, maxBound))) {
-        hit = false;
-        break;
-      }
+      } 
       mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
       sideDist += vec3(mask) * deltaDist;
       voxelPos += ivec3(mask) * rayStep;
+      if (any(lessThan(voxelPos, minBound)) || any(greaterThan(voxelPos, maxBound))) {
+        hit = false;
+        break;
+      }
     }
     if (hit) {
 
@@ -163,7 +164,7 @@ const EffectShader = {
   }
   RayHit raycast(Ray ray) {
     vec2 voxelBoxDist = rayBoxDist(boxCenter - boxSize / 2.0, boxCenter + boxSize / 2.0, ray.origin, ray.direction);
-    float distToBox = voxelBoxDist.x;
+    float distToBox = voxelBoxDist.x + 0.001;
     float distInsideBox = voxelBoxDist.y;
     vec3 startPos = toVoxelSpace(ray.origin + distToBox * ray.direction);
     vec3 endPos = toVoxelSpace(ray.origin + (distToBox + distInsideBox) * ray.direction);
@@ -280,7 +281,7 @@ vec3 unpackThreeBytes(float packedFloat) {
       //  reflectedColor = color;
 
       } else {
-        reflectedColor = texture(skybox, viewDir).rgb / 3.14159;
+        reflectedColor = texture(skybox, ray.direction).rgb / 3.14159;
       }
 
     vec3 s = texture2D(
