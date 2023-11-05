@@ -23,7 +23,8 @@ const EffectShader = {
         'boxCenter': { value: new THREE.Vector3(0, 0, 0) },
         'voxelAmount': { value: new THREE.Vector3(1, 1, 1) },
         'debugVoxels': { value: false },
-        'roughness': { value: 1.0 }
+        'roughness': { value: 1.0 },
+        'samples': { value: 1.0 }
     },
 
     vertexShader: /* glsl */ `
@@ -54,6 +55,7 @@ const EffectShader = {
     uniform float time;
     uniform float roughness;
     uniform bool debugVoxels;
+    uniform float samples;
     uniform vec3 boxSize;
     uniform vec3 boxCenter;
     varying vec2 vUv;
@@ -228,27 +230,10 @@ vec3 unpackThreeBytes(float packedFloat) {
   
   return bytes / 255.0;
 }
-		void main() {
-      if (texture2D(sceneDepth, vUv).r == 1.0) {
-        gl_FragColor = texture(sceneDiffuse, vUv);
-        return;
-      }
-      float depth = texture(sceneDepth, vUv).r;
-      vec3 worldPos = (viewMatrixInv * vec4(getWorldPos(depth, vUv), 1.0)).xyz;
-      vec3 normal = normalize((viewMatrixInv * vec4(
-        texture2D(sceneNormal, vUv).rgb * 2.0 - 1.0,
-         0.0)).xyz);
 
-
-
-      vec3 viewDir = normalize(worldPos - cameraPos);
-      vec3 reflectedDir = reflect(viewDir, normal);
-      vec2 diskInfo;
-      diskInfo = texture2D(
-        bluenoise,
-        gl_FragCoord.xy / vec2(1024)
-      ).rg;
-      diskInfo.r = sqrt(diskInfo.r);
+vec3 getSampleDir(vec2 diskInfo, vec3 normal, vec3 viewDir, vec3 worldPos, float roughness) {
+  vec3 reflectedDir = reflect(viewDir, normal);
+  diskInfo.r = sqrt(diskInfo.r);
 
       vec2 diskPos = vec2(
         diskInfo.r * cos(diskInfo.g * 2.0 * 3.14159),
@@ -264,15 +249,74 @@ vec3 unpackThreeBytes(float packedFloat) {
       vec3 bitangent = cross(normal, tangent);
       mat3 TBN = mat3(tangent, bitangent, normal);
        reflectedDir = normalize(mix(reflectedDir, normalize(TBN * hemisphereDir), roughness));
-    vec3 voxelRatioResults = voxelAmount / boxSize;
-    float voxelRatioMax = 1.0 / max(max(voxelRatioResults.x, voxelRatioResults.y), voxelRatioResults.z);
+       return reflectedDir;
+}
+vec3 takeSample(
+  vec3 cameraPos,
+  vec3 worldPos,
+  vec3 normal,
+  vec3 viewDir,
+  vec2 diskInfo,
+  float roughness
+) {
+  vec3 reflectedDir = getSampleDir(diskInfo, normal, viewDir, worldPos, roughness);
+  vec3 voxelRatioResults = voxelAmount / boxSize;
+  float voxelRatioMax = 1.0 / max(max(voxelRatioResults.x, voxelRatioResults.y), voxelRatioResults.z);
 
-      Ray ray;
-      ray.origin = debugVoxels ? cameraPos : worldPos + normal * voxelRatioMax + reflectedDir * voxelRatioMax;
-      ray.direction = debugVoxels ? viewDir : reflectedDir;
-      RayHit hit = raycast(ray);
+    Ray ray;
+    ray.origin = debugVoxels ? cameraPos : worldPos + normal * voxelRatioMax + reflectedDir * voxelRatioMax;
+    ray.direction = debugVoxels ? viewDir : reflectedDir;
+    RayHit hit = raycast(ray);
+    vec3 reflectedColor = vec3(0.0);
+    if (hit.hit) {
+      vec3 voxData = getVoxelColor(hit.voxelPos);
+      vec3 voxNormal = 2.0 * unpackThreeBytes(voxData.b) - 1.0;
+      vec3 color = unpackThreeBytes(voxData.r).rgb;
+      vec3 backColor = unpackThreeBytes(voxData.g).rgb;
+      reflectedColor = dot(voxNormal, -ray.direction) > 0.0 ? color : backColor;
+
+    } else {
+      reflectedColor = texture(skybox, ray.direction).rgb / 3.14159;
+    }
+    return reflectedColor;
+}
+		void main() {
+      if (texture2D(sceneDepth, vUv).r == 1.0) {
+        gl_FragColor = texture(sceneDiffuse, vUv);
+        return;
+      }
+      float depth = texture(sceneDepth, vUv).r;
+      vec3 worldPos = (viewMatrixInv * vec4(getWorldPos(depth, vUv), 1.0)).xyz;
+      vec3 normal = normalize((viewMatrixInv * vec4(
+        texture2D(sceneNormal, vUv).rgb * 2.0 - 1.0,
+         0.0)).xyz);
+
+
+
+      vec3 viewDir = normalize(worldPos - cameraPos);
+
+     vec2 initialSample = texture2D(
+        bluenoise,
+        gl_FragCoord.xy / vec2(1024)
+      ).rg;
+      vec2 harmoniousNumbers = vec2(
+        1.618033988749895,
+        1.324717957244746
+      );
       vec3 reflectedColor = vec3(0.0);
-      if (hit.hit) {
+      for(float i = 0.0; i < samples; i++) {
+        vec2 s = fract(initialSample + i * harmoniousNumbers);
+        reflectedColor += takeSample(cameraPos, worldPos, normal, viewDir, s, roughness);
+        // Add golden ratio offset
+       /* initialSample = vec2(
+          fract(initialSample.x + 0.618033988749895),
+          fract(initialSample.y + 0.618033988749895)
+        );*/
+        
+      }
+      reflectedColor /= samples;
+
+     /* if (hit.hit) {
         vec3 voxData = getVoxelColor(hit.voxelPos);
         vec3 voxNormal = 2.0 * unpackThreeBytes(voxData.b) - 1.0;
         vec3 color = unpackThreeBytes(voxData.r).rgb;
@@ -282,7 +326,7 @@ vec3 unpackThreeBytes(float packedFloat) {
 
       } else {
         reflectedColor = texture(skybox, ray.direction).rgb / 3.14159;
-      }
+      }*/
 
     vec3 s = texture2D(
       sceneDiffuse,

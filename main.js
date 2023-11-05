@@ -1078,7 +1078,8 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         denoise: true,
         denoiseStrength: 1.0,
         roughness: 1.0,
-        giStrength: 4.0
+        giStrength: 4.0,
+        samples: 1
     }
     gui.add(effectController, "voxelsOnly").onChange((value) => {
         if (value) {
@@ -1104,6 +1105,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         }
     });
     gui.add(effectController, "giOnly");
+    gui.add(effectController, "samples", 1, 16, 1);
     gui.add(effectController, "denoiseStrength", 0.0, 1.0);
     gui.add(effectController, "giStrength", 0.0, 5.0);
     gui.add(effectController, "roughness", 0.0, 1.0);
@@ -1182,6 +1184,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         effectPass.uniforms['roughness'].value = effectController.roughness;
         effectPass.uniforms['voxelAmount'].value = VOXEL_AMOUNT;
         effectPass.uniforms['debugVoxels'].value = effectController.voxelsOnly;
+        effectPass.uniforms['samples'].value = effectController.samples;
         const blurnums = [16, 4, 1];
         blurs.forEach(([hblur, vblur], i) => {
             const blurSize = blurnums[i];
