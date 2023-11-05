@@ -98,6 +98,7 @@ const EffectShader = {
     vec3 deltaDist = abs(vec3(length(ray.direction)) / ray.direction);
     ivec3 rayStep = ivec3(sign(ray.direction));
     ivec3 voxelPos = ivec3(floor(startPos));
+    ivec3 endPos = ivec3(floor(startPos + ray.direction * dist));
     vec3 sideDist = (sign(ray.direction) * (vec3(voxelPos) - startPos) + (sign(ray.direction) * 0.5) + 0.5) * deltaDist;
     bvec3 mask;
     vec3 cushion = 1.0 / voxelAmount;
@@ -105,7 +106,11 @@ const EffectShader = {
     bool hit = false;
     ivec3 minBound = ivec3(0);
     ivec3 maxBound = ivec3(voxelAmount) - 1;
-    int maxSteps = int(ceil(dist * 2.0));
+    int maxSteps =  2 *
+      (abs(endPos.x - voxelPos.x) +
+      abs(endPos.y - voxelPos.y) +
+      abs(endPos.z - voxelPos.z));
+    
     for(int i = 0; i < maxSteps; i++) {
       int voxel = texelFetch(voxelTexture, 
         (voxelPos), 0
@@ -117,10 +122,6 @@ const EffectShader = {
       mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
       sideDist += vec3(mask) * deltaDist;
       voxelPos += ivec3(mask) * rayStep;
-      if (any(lessThan(voxelPos, minBound)) || any(greaterThan(voxelPos, maxBound))) {
-        hit = false;
-        break;
-      }
     }
     if (hit) {
 
