@@ -23,6 +23,7 @@ async function main() {
     camera.position.set(50, 75, 50);
 
     const renderer = new THREE.WebGLRenderer();
+    THREE.Texture.DEFAULT_ANISOTROPY = renderer.capabilities.getMaxAnisotropy();
     renderer.setSize(clientWidth, clientHeight);
     document.body.appendChild(renderer.domElement);
     renderer.shadowMap.enabled = true;
@@ -133,6 +134,9 @@ async function main() {
             child.castShadow = true;
             child.receiveShadow = true;
             child.material.dithering = true;
+            /* if (child.material.map) {
+                 child.material.map.anisotropy = 4;
+             }*/
             // child.material.envMap = environment;
         }
     });

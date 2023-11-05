@@ -306,27 +306,9 @@ vec3 takeSample(
       vec3 reflectedColor = vec3(0.0);
       for(float i = 0.0; i < samples; i++) {
         vec2 s = fract(initialSample + i * harmoniousNumbers);
-        reflectedColor += takeSample(cameraPos, worldPos, normal, viewDir, s, roughness);
-        // Add golden ratio offset
-       /* initialSample = vec2(
-          fract(initialSample.x + 0.618033988749895),
-          fract(initialSample.y + 0.618033988749895)
-        );*/
-        
+        reflectedColor += takeSample(cameraPos, worldPos, normal, viewDir, s, roughness);      
       }
       reflectedColor /= samples;
-
-     /* if (hit.hit) {
-        vec3 voxData = getVoxelColor(hit.voxelPos);
-        vec3 voxNormal = 2.0 * unpackThreeBytes(voxData.b) - 1.0;
-        vec3 color = unpackThreeBytes(voxData.r).rgb;
-        vec3 backColor = unpackThreeBytes(voxData.g).rgb;
-        reflectedColor = dot(voxNormal, -ray.direction) > 0.0 ? color : backColor;
-      //  reflectedColor = color;
-
-      } else {
-        reflectedColor = texture(skybox, ray.direction).rgb / 3.14159;
-      }*/
 
     vec3 s = texture2D(
       sceneDiffuse,
