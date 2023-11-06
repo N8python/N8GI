@@ -106,7 +106,7 @@ const EffectShader = {
     bool hit = false;
     ivec3 minBound = ivec3(0);
     ivec3 maxBound = ivec3(voxelAmount) - 1;
-    int maxSteps =  2 *
+    int maxSteps = 
       (abs(endPos.x - voxelPos.x) +
       abs(endPos.y - voxelPos.y) +
       abs(endPos.z - voxelPos.z));
@@ -166,17 +166,21 @@ const EffectShader = {
     return intersectPos;
   }
   RayHit raycast(Ray ray) {
-    vec2 voxelBoxDist = rayBoxDist(boxCenter - boxSize / 2.0, boxCenter + boxSize / 2.0, ray.origin, ray.direction);
+    vec3 startPos = toVoxelSpace(ray.origin);
+    vec3 voxelSpaceDir = ray.direction;
+    vec3 voxelRatioResults = voxelAmount / boxSize;
+    voxelSpaceDir *= voxelRatioResults;
+    voxelSpaceDir = normalize(voxelSpaceDir);
+    vec2 voxelBoxDist = rayBoxDist(vec3(0.0), voxelAmount, startPos, voxelSpaceDir);
     float distToBox = voxelBoxDist.x + 0.001;
     float distInsideBox = voxelBoxDist.y;
-    vec3 startPos = toVoxelSpace(ray.origin + distToBox * ray.direction);
-    vec3 endPos = toVoxelSpace(ray.origin + (distToBox + distInsideBox) * ray.direction);
-    vec3 voxelRatioResults = voxelAmount / boxSize;
-    float voxelRatioMax = max(max(voxelRatioResults.x, voxelRatioResults.y), voxelRatioResults.z);
-    ray.direction *= voxelRatioResults;
-    RayHit result = voxelCast(startPos, ray, distInsideBox * voxelRatioMax);
-   // result.pos = voxelIntersectPos(result.pos, ray);
+    RayHit result = voxelCast(startPos, Ray(
+      startPos,
+      voxelSpaceDir
+    ), distInsideBox);
     return result;
+
+
   }
 
 
