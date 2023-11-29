@@ -911,8 +911,9 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(clientWidth, clientHeight, {
         minFilter: THREE.LinearFilter,
         magFilter: THREE.LinearFilter,
-        format: THREE.RGBAFormat,
-        type: THREE.HalfFloatType,
+        format: 'RGB',
+        type: THREE.FloatType,
+        internalFormat: 'R11F_G11F_B10F'
     }));
     const smaaPass = new SMAAPass(clientWidth, clientHeight);
     const effectPass = new ShaderPass(EffectShader);
