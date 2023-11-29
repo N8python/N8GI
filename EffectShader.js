@@ -172,8 +172,9 @@ const EffectShader = {
     voxelSpaceDir *= voxelRatioResults;
     voxelSpaceDir = normalize(voxelSpaceDir);
     vec2 voxelBoxDist = rayBoxDist(vec3(0.0), voxelAmount, startPos, voxelSpaceDir);
-    float distToBox = voxelBoxDist.x + 0.001;
+    float distToBox = voxelBoxDist.x + 0.0001;
     float distInsideBox = voxelBoxDist.y;
+    startPos += distToBox * voxelSpaceDir;
     RayHit result = voxelCast(startPos, Ray(
       startPos,
       voxelSpaceDir

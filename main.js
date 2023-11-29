@@ -917,12 +917,6 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     }));
     const smaaPass = new SMAAPass(clientWidth, clientHeight);
     const effectPass = new ShaderPass(EffectShader);
-    //const denoisePass = new ShaderPass(PoissionBlur);
-    /* const denoisePasses = [];
-     for (let i = 0; i < 4; i++) {
-         const pass = new ShaderPass(PoissionBlur);
-         denoisePasses.push(pass);
-     }*/
     const blurs = [];
     for (let i = 0; i < 3; i++) {
         const hblur = new ShaderPass(HorizontalBlurShader);
