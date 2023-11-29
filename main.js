@@ -44,7 +44,7 @@ async function main() {
         "skybox/Box_Front.bmp",
         "skybox/Box_Back.bmp"
     ]);
-    environment.colorSpace = THREE.LinearSRGBColorSpace;
+    environment.colorSpace = THREE.SRGBColorSpace;
     scene.background = environment;
     // Lighting
     // const ambientLight = new THREE.AmbientLight(new THREE.Color(1.0, 1.0, 1.0), 0.25);
@@ -129,7 +129,8 @@ async function main() {
     tKnot4.receiveShadow = true;
     scene.add(tKnot4);
     sponza.scale.set(10, 10, 10);
-    sponza.traverse((child) => {
+    scene.add(sponza);
+    scene.traverse((child) => {
         if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
@@ -137,10 +138,10 @@ async function main() {
             /* if (child.material.map) {
                  child.material.map.anisotropy = 4;
              }*/
-            // child.material.envMap = environment;
+            child.material.envMap = environment;
+            child.material.envMapIntensity = 0.0;
         }
     });
-    scene.add(sponza);
     const box = new THREE.Box3().setFromObject(sponza, true);
     box.min = box.min.floor().addScalar(-2);
     box.max = box.max.ceil().addScalar(2);
@@ -1077,7 +1078,8 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         denoise: true,
         denoiseStrength: 1.0,
         roughness: 1.0,
-        giStrength: 4.0,
+        giStrength: 1.0,
+        useSimpleEnvmap: false,
         samples: 1
     }
     gui.add(effectController, "voxelsOnly").onChange((value) => {
@@ -1103,10 +1105,27 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
             });
         }
     });
+    gui.add(effectController, "useSimpleEnvmap").onChange((value) => {
+
+        if (!value) {
+            scene.traverse((child) => {
+                if (child.isMesh) {
+                    child.material.envMapIntensity = 0.0;
+                }
+            });
+        } else {
+            scene.traverse((child) => {
+                if (child.isMesh) {
+                    child.material.envMapIntensity = 1.0;
+                }
+            });
+        }
+
+    });
     gui.add(effectController, "giOnly");
     gui.add(effectController, "samples", 1, 16, 1);
     gui.add(effectController, "denoiseStrength", 0.0, 1.0);
-    gui.add(effectController, "giStrength", 0.0, 5.0);
+    gui.add(effectController, "giStrength", 0.0, 2.0);
     gui.add(effectController, "roughness", 0.0, 1.0);
 
     function animate() {
@@ -1137,7 +1156,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
 
         const ogIntensity = directionalLight.intensity;
         directionalLight.intensity = 0.0;
-        albedoLight.intensity = Math.PI / (1.0 - (1.0 / Math.PI));
+        albedoLight.intensity = Math.PI * Math.PI * (1 + 1 / Math.PI);
         renderer.setRenderTarget(albedoTexture);
         renderer.clear();
         renderer.render(scene, camera);
@@ -1205,7 +1224,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         effectCompositer.uniforms["sceneAlbedo"].value = albedoTexture.texture;
         effectCompositer.uniforms["sceneDepth"].value = defaultTexture.depthTexture;
         effectCompositer.uniforms["voxelTexture"].value = voxelRenderTarget.texture;
-        effectCompositer.uniforms['giStrengthMultiplier'].value = effectController.giStrength;
+        effectCompositer.uniforms['giStrengthMultiplier'].value = effectController.giStrength * (effectController.useSimpleEnvmap && !effectController.giOnly ? 0.0 : 1.0);
         effectCompositer.uniforms['giOnly'].value = effectController.giOnly;
         composer.render();
         controls.update();
