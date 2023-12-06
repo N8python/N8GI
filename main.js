@@ -149,6 +149,8 @@ async function main() {
     const center = box.getCenter(new THREE.Vector3());
 
     const VOXEL_AMOUNT = size.clone().multiplyScalar(0.5).floor(); //.addScalar(2);
+    let VOXEL_RATIO_MAX = (new THREE.Vector3(VOXEL_AMOUNT.x / size.x, VOXEL_AMOUNT.y / size.y, VOXEL_AMOUNT.z / size.z));
+    VOXEL_RATIO_MAX = Math.max(VOXEL_RATIO_MAX.x, VOXEL_RATIO_MAX.y, VOXEL_RATIO_MAX.z);
     const indexArray = new Int32Array(new SharedArrayBuffer(VOXEL_AMOUNT.z * VOXEL_AMOUNT.y * VOXEL_AMOUNT.x * 4));
     const voxelRenderTargetSize = Math.ceil(Math.sqrt(VOXEL_AMOUNT.z * VOXEL_AMOUNT.y * VOXEL_AMOUNT.x));
     const voxelRenderTarget = new THREE.WebGLRenderTarget(voxelRenderTargetSize, voxelRenderTargetSize, {
@@ -987,24 +989,29 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     composer.addPass(new ShaderPass(GammaCorrectionShader));
     composer.addPass(smaaPass);
     const workers = [];
-    const workerCount = 4;
+    const positionWorkers = [];
+    const workerCount = 16; //navigator.hardwareConcurrency;
 
     for (let i = 0; i < workerCount; i++) {
         const worker = new Worker('./voxel-worker.js', { type: "module" });
         workers.push(worker);
     }
-    const positionWorker = new Worker('./position-worker.js', { type: "module" });
-
-    for (let i = 0; i < children.length; i++) {
-        positionWorker.postMessage({
-            type: "add",
-            data: {
-                id: i,
-                position: children[i].geometry.attributes.position.array,
-                index: children[i].geometry.index.array,
-            }
-        });
+    //const positionWorker = new Worker('./position-worker.js', { type: "module" });
+    for (let i = 0; i < workerCount; i++) {
+        const worker = new Worker('./position-worker.js', { type: "module" });
+        positionWorkers.push(worker);
     }
+
+    /* for (let i = 0; i < children.length; i++) {
+         positionWorker.postMessage({
+             type: "add",
+             data: {
+                 id: i,
+                 position: children[i].geometry.attributes.position.array,
+                 index: children[i].geometry.index.array,
+             }
+         });
+     }*/
     voxelColorShader.material.uniforms["mapAtlas"].value = mapAtlas;
 
     window.addEventListener('resize', () => {
@@ -1027,6 +1034,92 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         albedoTexture.depthTexture.image.height = clientHeight;
 
     });
+    // Compute prefix sum of indices of each mesh
+    const meshIndexData = [];
+    let sum = 0;
+    for (let i = 0; i < children.length; i++) {
+        meshIndexData[i] = sum;
+        sum += children[i].geometry.index.array.length;
+    }
+    // Compute the splits along the prefix sum for each worker
+    const meshIndexSplits = [];
+    const splitSize = Math.ceil(sum / workerCount);
+    for (let i = 0; i < workerCount; i++) {
+        meshIndexSplits[i] = meshIndexData.findIndex((value) => value >= splitSize * (i + 1));
+    }
+    meshIndexSplits[workerCount - 1] = children.length;
+
+    // Give the position workers the meshes they need
+    /* for (let i = 0; i < children.length; i++) {
+        positionWorker.postMessage({
+            type: "add",
+            data: {
+                id: i,
+                position: children[i].geometry.attributes.position.array,
+                index: children[i].geometry.index.array,
+            }
+        });
+    }*/
+    for (let i = 0; i < workerCount; i++) {
+        const worker = positionWorkers[i];
+        const startIndex = i === 0 ? 0 : meshIndexSplits[i - 1];
+        const endIndex = meshIndexSplits[i];
+        for (let j = startIndex; j < endIndex; j++) {
+            worker.postMessage({
+                type: "add",
+                data: {
+                    id: j,
+                    position: children[j].geometry.attributes.position.array,
+                    index: children[j].geometry.index.array,
+                }
+            });
+        }
+    }
+
+
+
+
+    let firstVoxelization = true;
+    let sahSplits = [];
+
+    function computeSplits({ posArray, posBufferCount, sum }) {
+        let triangleSurfaceAreas = new Float32Array(sum / 3);
+        let sahSum = 0;
+        for (let i = 0; i < posBufferCount; i += 12) {
+            const x1 = posArray[i];
+            const y1 = posArray[i + 1];
+            const z1 = posArray[i + 2];
+            const x2 = posArray[i + 4];
+            const y2 = posArray[i + 5];
+            const z2 = posArray[i + 6];
+            const x3 = posArray[i + 8];
+            const y3 = posArray[i + 9];
+            const z3 = posArray[i + 10];
+            const ABx = x2 - x1,
+                ABy = y2 - y1,
+                ABz = z2 - z1;
+            const ACx = x3 - x1,
+                ACy = y3 - y1,
+                ACz = z3 - z1;
+
+            // Cross product components
+            const crossX = ABy * ACz - ABz * ACy;
+            const crossY = ABz * ACx - ABx * ACz;
+            const crossZ = ABx * ACy - ABy * ACx;
+            // Area of the triangle plus a constant factor to account for the cost of rasterizing small triangles
+            const area = 0.5 * Math.sqrt(crossX ** 2 + crossY ** 2 + crossZ ** 2) * VOXEL_RATIO_MAX + 10.0;
+            sahSum += area;
+            triangleSurfaceAreas[i / 12] = sahSum;
+        }
+        // Compute splits
+        const sahSplitSize = sahSum / workerCount;
+        sahSplits = [];
+        for (let i = 0; i < workerCount; i++) {
+            sahSplits[i] = triangleSurfaceAreas.findIndex((value) => value >= sahSplitSize * (i + 1));
+        }
+        sahSplits[workerCount - 1] = sum / 3;
+        return sahSplits;
+    }
     async function updateVoxels() {
         console.time();
         indexArray.fill(-1);
@@ -1036,49 +1129,52 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
             const transform = child.matrixWorld;
             transform.toArray(meshMatrixData, i * 16);
         }
-        let posBufferCount = 0;
-        await new Promise((resolve, reject) => {
-            positionWorker.onmessage = (e) => {
-                posBufferCount = e.data.data.posBufferCount;
+        const positionPromises = positionWorkers.map((worker, i) => new Promise((resolve, reject) => {
+            worker.onmessage = (e) => {
                 resolve();
             };
-            positionWorker.postMessage({
+            const startIndex = i === 0 ? 0 : meshIndexSplits[i - 1];
+            const endIndex = meshIndexSplits[i];
+            worker.postMessage({
                 type: "transform",
                 data: {
                     meshMatrixData: meshMatrixData,
-                    posBufferAux: posBufferAux
+                    posBufferAux: posBufferAux,
+                    startIndex: meshIndexData[startIndex] * 4,
+                    startMesh: startIndex,
+                    endMesh: endIndex,
                 }
             });
-        });
-
-
-
+        }));
+        await Promise.all(positionPromises);
+        const posBufferCount = 4 * sum;
         const posArray = posBufferAux.slice(0, posBufferCount);
-
-
-
+        if (firstVoxelization) {
+            // Compute splits of triangles by surface area
+            sahSplits = computeSplits({ posArray, posBufferCount, sum });
+            firstVoxelization = false;
+        }
         const pLen = posArray.length;
         const workerIndexLength = Math.ceil(pLen / workerCount / 12) * 12;
         const promises = workers.map((worker, i) => new Promise((resolve, reject) => {
             worker.onmessage = (e) => {
                 resolve();
             };
-            const startIndex = i * workerIndexLength;
-            let endIndex = (i + 1) * workerIndexLength;
-            // If this is the last worker, make sure it processes up to the end of indices
-            if (i === workerCount - 1) {
-                endIndex = pLen;
-            }
+            const startIndex = i === 0 ? 0 : sahSplits[i - 1] * 12;
+            const endIndex = sahSplits[i] * 12;
             worker.postMessage({
-                posArray: posArray.slice(startIndex, endIndex),
-                voxelCenter: voxelCenter,
-                voxelSize: voxelSize,
-                VOXEL_AMOUNT: VOXEL_AMOUNT,
-                indexArray: indexArray,
-                indexOffset: startIndex / 12,
+                type: "voxelize",
+                data: {
+                    posArray: posArray.slice(startIndex, endIndex),
+                    voxelCenter: voxelCenter,
+                    voxelSize: voxelSize,
+                    VOXEL_AMOUNT: VOXEL_AMOUNT,
+                    indexArray: indexArray,
+                    indexOffset: startIndex / 12,
+                }
+
             });
         }));
-
         await Promise.all(promises);
         indexTex.needsUpdate = true;
         meshMatrixTex.needsUpdate = true;

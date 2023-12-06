@@ -6,16 +6,16 @@ self.onmessage = (e) => {
     const { type, data } = e.data;
     if (type === "add") {
         const { id, position, index } = data;
-        console.log("add", id, position, index);
+        //console.log("add", id, position, index);
         positionMap.set(id, position);
         indexMap.set(id, index);
         children++;
     }
     if (type === "transform") {
-        const { meshMatrixData, posBufferAux } = data;
+        const { meshMatrixData, posBufferAux, startIndex, startMesh, endMesh } = data;
 
-        let posBufferCount = 0;
-        for (let i = 0; i < children; i++) {
+        let posBufferCount = startIndex;
+        for (let i = startMesh; i < endMesh; i++) {
             const id = i;
             const positions = positionMap.get(id);
             const indices = indexMap.get(id);
@@ -43,7 +43,7 @@ self.onmessage = (e) => {
                 posBufferAux[posBufferCount++] = 1.0;
             }
         }
-        self.postMessage({ type: "transform", data: { posBufferCount } });
+        self.postMessage({ type: "transform", data: { posBufferCount: posBufferCount } });
     }
 
 }

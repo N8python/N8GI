@@ -174,49 +174,53 @@ const renderTriangle = (ax, ay, az, bx, by, bz, cx, cy, cz, voxelAmountX, voxelA
         }
     }
 }
+const positionMap = new Map();
+const indexMap = new Map();
 self.onmessage = async(event) => {
+    const { type, data } = event.data;
+    if (type === "voxelize") {
+        const voxelCenter = new THREE.Vector3(data.voxelCenter.x, data.voxelCenter.y, data.voxelCenter.z);
+        const voxelSize = new THREE.Vector3(data.voxelSize.x, data.voxelSize.y, data.voxelSize.z);
+        const VOXEL_AMOUNT = new THREE.Vector3(data.VOXEL_AMOUNT.x, data.VOXEL_AMOUNT.y, data.VOXEL_AMOUNT.z);
+        const halfSize = voxelSize.clone().multiplyScalar(0.5);
+        const voxelRatio = VOXEL_AMOUNT.clone().divide(voxelSize);
+        const halfSizeMinusVoxelCenter = halfSize.clone().sub(voxelCenter);
 
-    const voxelCenter = new THREE.Vector3(event.data.voxelCenter.x, event.data.voxelCenter.y, event.data.voxelCenter.z);
-    const voxelSize = new THREE.Vector3(event.data.voxelSize.x, event.data.voxelSize.y, event.data.voxelSize.z);
-    const VOXEL_AMOUNT = new THREE.Vector3(event.data.VOXEL_AMOUNT.x, event.data.VOXEL_AMOUNT.y, event.data.VOXEL_AMOUNT.z);
-    const halfSize = voxelSize.clone().multiplyScalar(0.5);
-    const voxelRatio = VOXEL_AMOUNT.clone().divide(voxelSize);
-    const halfSizeMinusVoxelCenter = halfSize.clone().sub(voxelCenter);
-
-    const posArray = event.data.posArray;
-    //const iLen = indices.length;
-    const voxelAmountX = VOXEL_AMOUNT.x;
-    const voxelAmountY = VOXEL_AMOUNT.y;
-    const voxelAmountXY = voxelAmountX * voxelAmountY;
-    const voxelAmountZ = VOXEL_AMOUNT.z;
-    const halfSizeMinusVoxelCenterX = halfSizeMinusVoxelCenter.x;
-    const halfSizeMinusVoxelCenterY = halfSizeMinusVoxelCenter.y;
-    const halfSizeMinusVoxelCenterZ = halfSizeMinusVoxelCenter.z;
-    const voxelRatioX = voxelRatio.x;
-    const voxelRatioY = voxelRatio.y;
-    const voxelRatioZ = voxelRatio.z;
-    const halfSizeMinusVoxelCenterXTimesVoxelRatioX = halfSizeMinusVoxelCenterX * voxelRatioX;
-    const halfSizeMinusVoxelCenterYTimesVoxelRatioY = halfSizeMinusVoxelCenterY * voxelRatioY;
-    const halfSizeMinusVoxelCenterZTimesVoxelRatioZ = halfSizeMinusVoxelCenterZ * voxelRatioZ;
-    const indexArray = event.data.indexArray;
-    const indexOffset = event.data.indexOffset;
-    const pLength = posArray.length;
-    for (let i = 0, j = indexOffset; i < pLength; i += 12) {
-        renderTriangle(posArray[i] * voxelRatioX + halfSizeMinusVoxelCenterXTimesVoxelRatioX,
-            posArray[i + 1] * voxelRatioY + halfSizeMinusVoxelCenterYTimesVoxelRatioY,
-            posArray[i + 2] * voxelRatioZ + halfSizeMinusVoxelCenterZTimesVoxelRatioZ,
-            posArray[i + 4] * voxelRatioX + halfSizeMinusVoxelCenterXTimesVoxelRatioX,
-            posArray[i + 5] * voxelRatioY + halfSizeMinusVoxelCenterYTimesVoxelRatioY,
-            posArray[i + 6] * voxelRatioZ + halfSizeMinusVoxelCenterZTimesVoxelRatioZ,
-            posArray[i + 8] * voxelRatioX + halfSizeMinusVoxelCenterXTimesVoxelRatioX,
-            posArray[i + 9] * voxelRatioY + halfSizeMinusVoxelCenterYTimesVoxelRatioY,
-            posArray[i + 10] * voxelRatioZ + halfSizeMinusVoxelCenterZTimesVoxelRatioZ,
-            voxelAmountX,
-            voxelAmountY,
-            voxelAmountZ,
-            indexArray,
-            j++
-        );
+        const posArray = data.posArray;
+        //const iLen = indices.length;
+        const voxelAmountX = VOXEL_AMOUNT.x;
+        const voxelAmountY = VOXEL_AMOUNT.y;
+        const voxelAmountXY = voxelAmountX * voxelAmountY;
+        const voxelAmountZ = VOXEL_AMOUNT.z;
+        const halfSizeMinusVoxelCenterX = halfSizeMinusVoxelCenter.x;
+        const halfSizeMinusVoxelCenterY = halfSizeMinusVoxelCenter.y;
+        const halfSizeMinusVoxelCenterZ = halfSizeMinusVoxelCenter.z;
+        const voxelRatioX = voxelRatio.x;
+        const voxelRatioY = voxelRatio.y;
+        const voxelRatioZ = voxelRatio.z;
+        const halfSizeMinusVoxelCenterXTimesVoxelRatioX = halfSizeMinusVoxelCenterX * voxelRatioX;
+        const halfSizeMinusVoxelCenterYTimesVoxelRatioY = halfSizeMinusVoxelCenterY * voxelRatioY;
+        const halfSizeMinusVoxelCenterZTimesVoxelRatioZ = halfSizeMinusVoxelCenterZ * voxelRatioZ;
+        const indexArray = data.indexArray;
+        const indexOffset = data.indexOffset;
+        const pLength = posArray.length;
+        for (let i = 0, j = indexOffset; i < pLength; i += 12) {
+            renderTriangle(posArray[i] * voxelRatioX + halfSizeMinusVoxelCenterXTimesVoxelRatioX,
+                posArray[i + 1] * voxelRatioY + halfSizeMinusVoxelCenterYTimesVoxelRatioY,
+                posArray[i + 2] * voxelRatioZ + halfSizeMinusVoxelCenterZTimesVoxelRatioZ,
+                posArray[i + 4] * voxelRatioX + halfSizeMinusVoxelCenterXTimesVoxelRatioX,
+                posArray[i + 5] * voxelRatioY + halfSizeMinusVoxelCenterYTimesVoxelRatioY,
+                posArray[i + 6] * voxelRatioZ + halfSizeMinusVoxelCenterZTimesVoxelRatioZ,
+                posArray[i + 8] * voxelRatioX + halfSizeMinusVoxelCenterXTimesVoxelRatioX,
+                posArray[i + 9] * voxelRatioY + halfSizeMinusVoxelCenterYTimesVoxelRatioY,
+                posArray[i + 10] * voxelRatioZ + halfSizeMinusVoxelCenterZTimesVoxelRatioZ,
+                voxelAmountX,
+                voxelAmountY,
+                voxelAmountZ,
+                indexArray,
+                j++
+            );
+        }
     }
     self.postMessage({});
 
