@@ -16,8 +16,8 @@ import { HorizontalBlurShader } from './HorizontalBlurShader.js';
 import { Stats } from "./stats.js";
 async function main() {
     // Setup basic renderer, controls, and profiler
-    const clientWidth = window.innerWidth;
-    const clientHeight = window.innerHeight;
+    let clientWidth = window.innerWidth;
+    let clientHeight = window.innerHeight;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, clientWidth / clientHeight, 0.1, 1000);
     camera.position.set(50, 75, 50);
@@ -332,7 +332,7 @@ async function main() {
         `
     }));
     scene.add(uniformsCapture);
-    const meshMatrixData = new Float32Array(children.length * 4 * 4);
+    const meshMatrixData = new Float32Array(new SharedArrayBuffer(children.length * 4 * 4 * 4));
     const meshMatrixTex = new THREE.DataTexture(meshMatrixData, 4, children.length, THREE.RGBAFormat, THREE.FloatType);
     meshMatrixTex.needsUpdate = true;
     const voxelColorShader = new FullScreenQuad(new THREE.ShaderMaterial({
@@ -993,44 +993,65 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         const worker = new Worker('./voxel-worker.js', { type: "module" });
         workers.push(worker);
     }
+    const positionWorker = new Worker('./position-worker.js', { type: "module" });
+
+    for (let i = 0; i < children.length; i++) {
+        positionWorker.postMessage({
+            type: "add",
+            data: {
+                id: i,
+                position: children[i].geometry.attributes.position.array,
+                index: children[i].geometry.index.array,
+            }
+        });
+    }
     voxelColorShader.material.uniforms["mapAtlas"].value = mapAtlas;
 
+    window.addEventListener('resize', () => {
+        clientWidth = window.innerWidth;
+        clientHeight = window.innerHeight;
 
+        camera.aspect = clientWidth / clientHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(clientWidth, clientHeight);
+        composer.setSize(clientWidth, clientHeight);
+        defaultTexture.setSize(clientWidth, clientHeight);
+        normalTexture.setSize(clientWidth, clientHeight);
+        albedoTexture.setSize(clientWidth, clientHeight);
+        defaultTexture.depthTexture.image.width = clientWidth;
+        defaultTexture.depthTexture.image.height = clientHeight;
+        normalTexture.depthTexture.image.width = clientWidth;
+        normalTexture.depthTexture.image.height = clientHeight;
+        albedoTexture.depthTexture.image.width = clientWidth;
+        albedoTexture.depthTexture.image.height = clientHeight;
+
+    });
     async function updateVoxels() {
-        // voxelBuffer.fill(0);
+        console.time();
         indexArray.fill(-1);
-        // Put all the sponza indices into the index buffer
-        // const children = [];
-        let posBufferCount = 0;
         for (let i = 0; i < children.length; i++) {
             const child = children[i];
-            child.updateMatrixWorld(true);
-            const indices = child.geometry.index.array;
-            const posArray = child.geometry.attributes.position.array;
+            child.updateWorldMatrix(false, false);
             const transform = child.matrixWorld;
-            transform.toArray(meshMatrixData, child.meshIndex * 16);
-            const [
-                e0, e1, e2, e3,
-                e4, e5, e6, e7,
-                e8, e9, e10, e11,
-                e12, e13, e14, e15
-            ] = transform.elements;
-            const iLen = indices.length;
-            for (let j = 0; j < iLen; j++) {
-                const i = indices[j];
-                const _x = posArray[i * 3];
-                const _y = posArray[i * 3 + 1];
-                const _z = posArray[i * 3 + 2];
-                const x = _x * e0 + _y * e4 + _z * e8 + e12;
-                const y = _x * e1 + _y * e5 + _z * e9 + e13;
-                const z = _x * e2 + _y * e6 + _z * e10 + e14;
-
-                posBufferAux[posBufferCount++] = x;
-                posBufferAux[posBufferCount++] = y;
-                posBufferAux[posBufferCount++] = z;
-                posBufferAux[posBufferCount++] = 1.0;
-            }
+            transform.toArray(meshMatrixData, i * 16);
         }
+        let posBufferCount = 0;
+        await new Promise((resolve, reject) => {
+            positionWorker.onmessage = (e) => {
+                posBufferCount = e.data.data.posBufferCount;
+                resolve();
+            };
+            positionWorker.postMessage({
+                type: "transform",
+                data: {
+                    meshMatrixData: meshMatrixData,
+                    posBufferAux: posBufferAux
+                }
+            });
+        });
+
+
 
         const posArray = posBufferAux.slice(0, posBufferCount);
 
@@ -1064,7 +1085,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         renderer.setRenderTarget(voxelRenderTarget);
         renderer.clear();
         voxelColorShader.render(renderer);
-        // scene.add(instancedVoxelMesh);
+        console.timeEnd();
         requestAnimationFrame(updateVoxels);
     }
     const albedoLight = new THREE.AmbientLight(0xffffff, Math.PI);
