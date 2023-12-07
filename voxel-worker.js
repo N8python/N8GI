@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.155.0/build/three.module.min.js';
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.min.js';
 const renderTriangle = (ax, ay, az, bx, by, bz, cx, cy, cz, voxelAmountX, voxelAmountY, voxelAmountZ, indexArray, i) => {
     const voxelAmountXY = voxelAmountX * voxelAmountY;
 

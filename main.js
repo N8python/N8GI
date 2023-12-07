@@ -1,18 +1,19 @@
-import * as THREE from 'https://unpkg.com/three@0.155.0/build/three.module.min.js';
-import { EffectComposer } from 'https://unpkg.com/three@0.155.0/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'https://unpkg.com/three@0.155.0/examples/jsm/postprocessing/RenderPass.js';
-import { ShaderPass } from 'https://unpkg.com/three@0.155.0/examples/jsm/postprocessing/ShaderPass.js';
-import { SMAAPass } from 'https://unpkg.com/three@0.155.0/examples/jsm/postprocessing/SMAAPass.js';
-import { GammaCorrectionShader } from 'https://unpkg.com/three@0.155.0/examples/jsm/shaders/GammaCorrectionShader.js';
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.min.js';
+import { EffectComposer } from 'https://unpkg.com/three@0.158.0/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'https://unpkg.com/three@0.158.0/examples/jsm/postprocessing/RenderPass.js';
+import { ShaderPass } from 'https://unpkg.com/three@0.158.0/examples/jsm/postprocessing/ShaderPass.js';
+import { SMAAPass } from 'https://unpkg.com/three@0.158.0/examples/jsm/postprocessing/SMAAPass.js';
+import { GammaCorrectionShader } from 'https://unpkg.com/three@0.158.0/examples/jsm/shaders/GammaCorrectionShader.js';
 import { EffectShader } from "./EffectShader.js";
 import { PoissionBlur } from "./PoissionBlur.js";
-import { OrbitControls } from 'https://unpkg.com/three@0.155.0/examples/jsm/controls/OrbitControls.js';
-import { GLTFLoader } from 'https://unpkg.com/three@0.155.0/examples/jsm/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'https://unpkg.com/three@0.155.0/examples/jsm/loaders/DRACOLoader.js';
-import { GUI } from 'https://unpkg.com/three@0.155.0/examples/jsm/libs/lil-gui.module.min.js';
+import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'https://unpkg.com/three@0.158.0/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'https://unpkg.com/three@0.158.0/examples/jsm/loaders/DRACOLoader.js';
+import { GUI } from 'https://unpkg.com/three@0.158.0/examples/jsm/libs/lil-gui.module.min.js';
 import { FullScreenQuad } from "https://unpkg.com/three/examples/jsm/postprocessing/Pass.js";
 import { VerticalBlurShader } from './VerticalBlurShader.js';
 import { HorizontalBlurShader } from './HorizontalBlurShader.js';
+import { N8AOPass } from "https://unpkg.com/n8ao@latest/dist/N8AO.js"
 import { Stats } from "./stats.js";
 async function main() {
     // Setup basic renderer, controls, and profiler
@@ -80,7 +81,7 @@ async function main() {
     );
     tKnot.position.y = 50;
     tKnot.position.z = 35;
-    tKnot.scale.set(0.5, 0.5, 0.5);
+    //  tKnot.scale.set(0.5, 0.5, 0.5);
     tKnot.castShadow = true;
     tKnot.receiveShadow = true;
     scene.add(tKnot);
@@ -95,7 +96,7 @@ async function main() {
     );
     tKnot2.position.y = 15;
     tKnot2.position.z = -35;
-    tKnot2.scale.set(0.5, 0.5, 0.5);
+    //tKnot2.scale.set(0.5, 0.5, 0.5);
     tKnot2.castShadow = true;
     tKnot2.receiveShadow = true;
     scene.add(tKnot2);
@@ -918,6 +919,24 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         type: THREE.FloatType,
         internalFormat: 'R11F_G11F_B10F'
     }));
+    const n8aopass = new N8AOPass(scene, camera, clientWidth, clientHeight);
+    n8aopass.configuration.autoRenderBeauty = false;
+    n8aopass.beautyRenderTarget = defaultTexture;
+    n8aopass.configuration.gammaCorrection = false;
+    n8aopass.configuration.aoSamples = 64;
+    n8aopass.configuration.denoiseRadius = 3;
+    n8aopass.configuration.aoRadius = 10;
+    n8aopass.setDisplayMode("AO");
+
+    const n8aoRenderTarget = new THREE.WebGLRenderTarget(clientWidth, clientHeight, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: 'RGB',
+        type: THREE.FloatType,
+        internalFormat: 'R11F_G11F_B10F'
+    });
+
+
     const smaaPass = new SMAAPass(clientWidth, clientHeight);
     const effectPass = new ShaderPass(EffectShader);
     const blurs = [];
@@ -938,10 +957,12 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
             sceneDiffuse: { value: null },
             sceneDepth: { value: null },
             sceneAlbedo: { value: null },
+            sceneAO: { value: null },
             voxelTexture: { value: null },
             tDiffuse: { value: null },
             giStrengthMultiplier: { value: 1.0 },
-            giOnly: { value: false }
+            giOnly: { value: false },
+            aoEnabled: { value: true },
         },
         vertexShader: `
         varying vec2 vUv;
@@ -954,14 +975,20 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         uniform sampler2D sceneDiffuse;
         uniform sampler2D sceneDepth;
         uniform sampler2D sceneAlbedo;
+        uniform sampler2D sceneAO;
         uniform sampler2D tDiffuse;
         uniform sampler2D voxelTexture;
         uniform float giStrengthMultiplier;
+        uniform bool aoEnabled;
         uniform bool giOnly;
         varying vec2 vUv;
         void main() {
             vec4 diffuse = texture2D(sceneDiffuse, vUv);
             float depth = texture2D(sceneDepth, vUv).r;
+            vec4 ao =texture2D(sceneAO, vUv);
+            if (!aoEnabled) {
+                ao = vec4(1.0);
+            }
             vec4 albedo = texture2D(sceneAlbedo, vUv);
             vec4 denoised = texture2D(tDiffuse, vUv);
             if (depth == 1.0) {
@@ -969,9 +996,9 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                 return;
             }
             float giStrength = giStrengthMultiplier;
-            gl_FragColor = vec4(diffuse.rgb + denoised.rgb * albedo.rgb * giStrength, 1.0);
+            gl_FragColor = vec4((diffuse.rgb + denoised.rgb * albedo.rgb * giStrength) * ao.rgb, 1.0);
             if (giOnly) {
-                gl_FragColor = vec4(giStrength * denoised.rgb, 1.0);
+                gl_FragColor = vec4(giStrength * denoised.rgb * ao.rgb, 1.0);
             }
         }
         `
@@ -988,6 +1015,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     composer.addPass(effectCompositer);
     composer.addPass(new ShaderPass(GammaCorrectionShader));
     composer.addPass(smaaPass);
+
     const workers = [];
     const positionWorkers = [];
     const workerCount = 16; //navigator.hardwareConcurrency;
@@ -996,22 +1024,10 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         const worker = new Worker('./voxel-worker.js', { type: "module" });
         workers.push(worker);
     }
-    //const positionWorker = new Worker('./position-worker.js', { type: "module" });
     for (let i = 0; i < workerCount; i++) {
         const worker = new Worker('./position-worker.js', { type: "module" });
         positionWorkers.push(worker);
     }
-
-    /* for (let i = 0; i < children.length; i++) {
-         positionWorker.postMessage({
-             type: "add",
-             data: {
-                 id: i,
-                 position: children[i].geometry.attributes.position.array,
-                 index: children[i].geometry.index.array,
-             }
-         });
-     }*/
     voxelColorShader.material.uniforms["mapAtlas"].value = mapAtlas;
 
     window.addEventListener('resize', () => {
@@ -1032,6 +1048,9 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         normalTexture.depthTexture.image.height = clientHeight;
         albedoTexture.depthTexture.image.width = clientWidth;
         albedoTexture.depthTexture.image.height = clientHeight;
+        n8aoRenderTarget.setSize(clientWidth, clientHeight);
+        n8aopass.setSize(clientWidth, clientHeight);
+
 
     });
     // Compute prefix sum of indices of each mesh
@@ -1049,17 +1068,6 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     }
     meshIndexSplits[workerCount - 1] = children.length;
 
-    // Give the position workers the meshes they need
-    /* for (let i = 0; i < children.length; i++) {
-        positionWorker.postMessage({
-            type: "add",
-            data: {
-                id: i,
-                position: children[i].geometry.attributes.position.array,
-                index: children[i].geometry.index.array,
-            }
-        });
-    }*/
     for (let i = 0; i < workerCount; i++) {
         const worker = positionWorkers[i];
         const startIndex = i === 0 ? 0 : meshIndexSplits[i - 1];
@@ -1197,7 +1205,12 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         roughness: 1.0,
         giStrength: 1.0,
         useSimpleEnvmap: false,
-        samples: 1
+        samples: 1,
+        aoSamples: 16,
+        aoRadius: 5,
+        denoiseRadius: 12,
+        aoEnabled: true,
+        aoIntensity: 5
     }
     gui.add(effectController, "voxelsOnly").onChange((value) => {
         if (value) {
@@ -1244,6 +1257,13 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     gui.add(effectController, "denoiseStrength", 0.0, 1.0);
     gui.add(effectController, "giStrength", 0.0, 2.0);
     gui.add(effectController, "roughness", 0.0, 1.0);
+    gui.add(effectController, "aoSamples", 1, 64, 1);
+    gui.add(effectController, "aoRadius", 1, 10, 1);
+    gui.add(effectController, "denoiseRadius", 1, 10, 1);
+    gui.add(effectController, "aoIntensity", 0.0, 10.0);
+    gui.add(effectController, "aoEnabled");
+
+
 
     function animate() {
         tKnot.rotation.y += 0.01;
@@ -1283,6 +1303,20 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         renderer.setRenderTarget(defaultTexture);
         renderer.clear();
         renderer.render(scene, camera);
+
+        if (effectController.aoEnabled) {
+            n8aopass.configuration.aoSamples = effectController.aoSamples;
+            n8aopass.configuration.aoRadius = effectController.aoRadius;
+            n8aopass.configuration.denoiseRadius = effectController.denoiseRadius;
+            n8aopass.configuration.intensity = effectController.aoIntensity;
+            n8aopass.render(
+                renderer,
+                n8aoRenderTarget,
+                null,
+                0,
+                false
+            );
+        }
 
         const uniforms = uniformsCapture.material.uniforms;
         uniforms.directionalLights.value.forEach(light => {
@@ -1340,9 +1374,11 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         effectCompositer.uniforms["sceneDiffuse"].value = defaultTexture.texture;
         effectCompositer.uniforms["sceneAlbedo"].value = albedoTexture.texture;
         effectCompositer.uniforms["sceneDepth"].value = defaultTexture.depthTexture;
+        effectCompositer.uniforms["sceneAO"].value = n8aoRenderTarget.texture;
         effectCompositer.uniforms["voxelTexture"].value = voxelRenderTarget.texture;
         effectCompositer.uniforms['giStrengthMultiplier'].value = effectController.giStrength * (effectController.useSimpleEnvmap && !effectController.giOnly ? 0.0 : 1.0);
         effectCompositer.uniforms['giOnly'].value = effectController.giOnly;
+        effectCompositer.uniforms['aoEnabled'].value = effectController.aoEnabled;
         composer.render();
         controls.update();
         stats.update();

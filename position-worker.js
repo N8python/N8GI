@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.155.0/build/three.module.min.js';
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.min.js';
 const positionMap = new Map();
 const indexMap = new Map();
 let children = 0;
