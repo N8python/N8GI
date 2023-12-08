@@ -13,7 +13,7 @@ import { GUI } from 'https://unpkg.com/three@0.158.0/examples/jsm/libs/lil-gui.m
 import { FullScreenQuad } from "https://unpkg.com/three/examples/jsm/postprocessing/Pass.js";
 import { VerticalBlurShader } from './VerticalBlurShader.js';
 import { HorizontalBlurShader } from './HorizontalBlurShader.js';
-import { N8AOPass } from "https://unpkg.com/n8ao@latest/dist/N8AO.js"
+import { N8AOPass } from "https://unpkg.com/n8ao@latest/dist/N8AO.js";
 import { Stats } from "./stats.js";
 async function main() {
     // Setup basic renderer, controls, and profiler
@@ -1017,16 +1017,11 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     composer.addPass(smaaPass);
 
     const workers = [];
-    const positionWorkers = [];
-    const workerCount = 16; //navigator.hardwareConcurrency;
+    const workerCount = navigator.hardwareConcurrency;
 
     for (let i = 0; i < workerCount; i++) {
         const worker = new Worker('./voxel-worker.js', { type: "module" });
         workers.push(worker);
-    }
-    for (let i = 0; i < workerCount; i++) {
-        const worker = new Worker('./position-worker.js', { type: "module" });
-        positionWorkers.push(worker);
     }
     voxelColorShader.material.uniforms["mapAtlas"].value = mapAtlas;
 
@@ -1069,7 +1064,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     meshIndexSplits[workerCount - 1] = children.length;
 
     for (let i = 0; i < workerCount; i++) {
-        const worker = positionWorkers[i];
+        const worker = workers[i];
         const startIndex = i === 0 ? 0 : meshIndexSplits[i - 1];
         const endIndex = meshIndexSplits[i];
         for (let j = startIndex; j < endIndex; j++) {
@@ -1137,7 +1132,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
             const transform = child.matrixWorld;
             transform.toArray(meshMatrixData, i * 16);
         }
-        const positionPromises = positionWorkers.map((worker, i) => new Promise((resolve, reject) => {
+        const positionPromises = workers.map((worker, i) => new Promise((resolve, reject) => {
             worker.onmessage = (e) => {
                 resolve();
             };
