@@ -1118,7 +1118,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         return sahSplits;
     }
     async function updateVoxels() {
-        console.time();
+        console.time("Voxelization: ");
         indexArray.fill(-1);
         for (let i = 0; i < children.length; i++) {
             const child = children[i];
@@ -1178,7 +1178,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         renderer.setRenderTarget(voxelRenderTarget);
         renderer.clear();
         voxelColorShader.render(renderer);
-        console.timeEnd();
+        console.timeEnd("Voxelization: ");
         requestAnimationFrame(updateVoxels);
     }
     const albedoLight = new THREE.AmbientLight(0xffffff, Math.PI);

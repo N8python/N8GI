@@ -180,7 +180,6 @@ self.onmessage = async(event) => {
     const { type, data } = event.data;
     if (type === "add") {
         const { id, position, index } = data;
-        //console.log("add", id, position, index);
         positionMap.set(id, position);
         indexMap.set(id, index);
     }
