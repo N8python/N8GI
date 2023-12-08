@@ -136,9 +136,6 @@ async function main() {
             child.castShadow = true;
             child.receiveShadow = true;
             child.material.dithering = true;
-            /* if (child.material.map) {
-                 child.material.map.anisotropy = 4;
-             }*/
             child.material.envMap = environment;
             child.material.envMapIntensity = 0.0;
         }
@@ -201,9 +198,6 @@ async function main() {
     meshIndexTex.maxFilter = THREE.NearestFilter;
     meshIndexTex.needsUpdate = true;
     const materials = [];
-    /* if (materials.indexOf(child.material) === -1) {
-         materials.push(child.material);
-     }*/
     scene.traverse((child) => {
         if (child.isMesh && child.geometry.index) {
             if (materials.indexOf(child.material) === -1) {
