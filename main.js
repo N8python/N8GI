@@ -1248,7 +1248,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
     gui.add(effectController, "roughness", 0.0, 1.0);
     gui.add(effectController, "aoSamples", 1, 64, 1);
     gui.add(effectController, "aoRadius", 1, 10, 1);
-    gui.add(effectController, "denoiseRadius", 1, 10, 1);
+    gui.add(effectController, "denoiseRadius", 1, 12, 1);
     gui.add(effectController, "aoIntensity", 0.0, 10.0);
     gui.add(effectController, "aoEnabled");
 
