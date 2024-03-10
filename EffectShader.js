@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.min.js';
+import * as THREE from 'https://unpkg.com/three@0.162.0/build/three.module.min.js';
 const EffectShader = {
 
     uniforms: {
@@ -303,7 +303,7 @@ vec3 takeSample(
 
      vec2 initialSample = texture2D(
         bluenoise,
-        gl_FragCoord.xy / vec2(1024)
+        gl_FragCoord.xy / vec2(textureSize(bluenoise, 0).xy)
       ).rg;
       vec2 harmoniousNumbers = vec2(
         1.618033988749895,

@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.min.js';
+import * as THREE from 'https://unpkg.com/three@0.162.0/build/three.module.min.js';
 
 const VerticalBlurShader = {
 
@@ -120,8 +120,9 @@ vec3 getWorldPos(float depth, vec2 coord) {
 			float planeConstant = -dot(uvWorldPos, normal);
 			for(float i = -4.0; i <= 4.0; i++) {
 				vec2 sampleUv = vec2( vUv.x, vUv.y + i * radius );
+				vec2 clipRangeCheck = step(vec2(0.0),sampleUv.xy) * step(sampleUv.xy, vec2(1.0));
 				float w = weights[int(i + 4.0)] * depthFalloff(sampleUv, planeNormal, planeConstant);// * colorFalloff(sampleUv, myColor);
-				sum += texture2D( tDiffuse, sampleUv) * w;
+				sum += texture2D( tDiffuse, sampleUv) * w * clipRangeCheck.x * clipRangeCheck.y;
 				weightSum += w;
 			}
 			sum /= weightSum;
