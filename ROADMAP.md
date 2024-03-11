@@ -22,6 +22,5 @@
 - Attempt the implementation of SVOs or some similar structure to accelerate tracing (initial attempts were not successful - it took longer to generate the acceleration structure than it did to trace the scene) 🔴
 - Allow moving around the volume being voxelized - to support GI in open worlds 🔴
 - Potentially have multiple cascades of voxels (the poor CPU!) ⚫️ 
-
-
-
+### Known Bugs
+- Startup voxelization is inconsistent (investigate) 🟡
