@@ -282,7 +282,7 @@ vec3 takeSample(
       reflectedColor = dot(voxNormal, -ray.direction) > 0.0 ? color : backColor;
 
     } else {
-      reflectedColor = texture(skybox, ray.direction).rgb / 3.14159;
+      reflectedColor = textureLod(skybox, ray.direction, 100.0).rgb / 3.14159;
     }
     return reflectedColor;
 }

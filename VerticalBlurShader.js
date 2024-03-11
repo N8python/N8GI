@@ -121,8 +121,8 @@ vec3 getWorldPos(float depth, vec2 coord) {
 			for(float i = -4.0; i <= 4.0; i++) {
 				vec2 sampleUv = vec2( vUv.x, vUv.y + i * radius );
 				vec2 clipRangeCheck = step(vec2(0.0),sampleUv.xy) * step(sampleUv.xy, vec2(1.0));
-				float w = weights[int(i + 4.0)] * depthFalloff(sampleUv, planeNormal, planeConstant);// * colorFalloff(sampleUv, myColor);
-				sum += texture2D( tDiffuse, sampleUv) * w * clipRangeCheck.x * clipRangeCheck.y;
+				float w = weights[int(i + 4.0)] * depthFalloff(sampleUv, planeNormal, planeConstant)  * clipRangeCheck.x * clipRangeCheck.y;// * colorFalloff(sampleUv, myColor);
+				sum += texture2D( tDiffuse, sampleUv) * w;
 				weightSum += w;
 			}
 			sum /= weightSum;

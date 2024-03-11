@@ -198,7 +198,7 @@ class N8GIPass extends Pass {
                 obj.intensity = 0;
             }
         });
-        this.albedoLight.intensity = Math.PI * Math.PI * (1 + 1 / Math.PI);
+        this.albedoLight.intensity = (Math.PI * Math.PI) / (1 - 1 / Math.PI);
         renderer.setRenderTarget(this.albedoTexture);
         renderer.clear();
         renderer.render(this.scene, this.camera);
