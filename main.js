@@ -210,7 +210,7 @@ async function main() {
     gui.add(effectController, "voxelsOnly");
     gui.add(effectController, "samples", 1, 16, 1);
     gui.add(effectController, "denoiseStrength", 0.0, 1.0);
-    gui.add(effectController, "giStrength", 0.0, 2.0);
+    gui.add(effectController, "giStrength", 0.0, Math.PI);
     gui.add(effectController, "roughness", 0.0, 1.0);
     gui.add(effectController, "aoSamples", 1, 64, 1);
     gui.add(effectController, "aoRadius", 1, 10, 1);
