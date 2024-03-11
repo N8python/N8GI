@@ -176,7 +176,8 @@ async function main() {
         aoRadius: 5,
         denoiseRadius: 12,
         aoEnabled: true,
-        aoIntensity: 5
+        aoIntensity: 5,
+        envLeak: 0
     }
 
 
@@ -184,13 +185,22 @@ async function main() {
         if (!value) {
             scene.traverse((child) => {
                 if (child.isMesh) {
-                    child.material.envMapIntensity = 0.0;
+                    child.material.envMapIntensity = effectController.envLeak;
                 }
             });
         } else {
             scene.traverse((child) => {
                 if (child.isMesh) {
                     child.material.envMapIntensity = 1.0;
+                }
+            });
+        }
+    });
+    gui.add(effectController, "envLeak", 0, 1, 0.01).onChange((value) => {
+        if (!effectController.useSimpleEnvmap) {
+            scene.traverse((child) => {
+                if (child.isMesh) {
+                    child.material.envMapIntensity = value;
                 }
             });
         }
