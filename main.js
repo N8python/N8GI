@@ -52,7 +52,8 @@ async function main() {
     directionalLight.shadow.camera.bottom = -200;
     directionalLight.shadow.camera.near = 0.1;
     directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.bias = -0.01;
+    directionalLight.shadow.bias = -0.0001;
+
     scene.add(directionalLight);
 
     const loader = new GLTFLoader();
@@ -169,7 +170,7 @@ async function main() {
         denoise: true,
         denoiseStrength: 1.0,
         roughness: 1.0,
-        giStrength: 1.0,
+        giStrength: Math.PI,
         useSimpleEnvmap: false,
         samples: 1,
         aoSamples: 16,
@@ -237,10 +238,13 @@ async function main() {
         n8giPass.configuration.roughness = effectController.roughness;
         n8giPass.configuration.giStrength = effectController.giStrength;
         n8giPass.configuration.useSimpleEnvmap = effectController.useSimpleEnvmap;
+        n8giPass.configuration.aoEnabled = effectController.aoEnabled;
+        n8giPass.n8aopass.configuration.aoEnabled = effectController.aoEnabled;
         n8giPass.n8aopass.configuration.aoSamples = effectController.aoSamples;
         n8giPass.n8aopass.configuration.aoRadius = effectController.aoRadius;
         n8giPass.n8aopass.configuration.denoiseRadius = effectController.denoiseRadius;
         n8giPass.n8aopass.configuration.intensity = effectController.aoIntensity;
+
 
         directionalLight.position.set(
             60 * Math.cos(performance.now() / 1000),

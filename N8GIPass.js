@@ -20,8 +20,6 @@ class N8GIPass extends Pass {
 
         this.camera = camera;
         this.scene = scene;
-        this.albedoLight = new THREE.AmbientLight(0xffffff, Math.PI);
-        scene.add(this.albedoLight);
         this.configuration = new Proxy({
             voxelsOnly: false,
             giOnly: false,
@@ -30,7 +28,8 @@ class N8GIPass extends Pass {
             roughness: 1.0,
             giStrength: 1.0,
             useSimpleEnvmap: false,
-            samples: 1
+            samples: 1,
+            aoEnabled: true
         }, {
             set: (target, propName, value) => {
                 const oldProp = target[propName];
@@ -110,9 +109,17 @@ class N8GIPass extends Pass {
             `
         }));
         scene.add(this.uniformsCapture);
-        this.defaultTexture = createGBufferSplit(width, height);
-        this.normalTexture = createGBufferSplit(width, height);
-        this.albedoTexture = createGBufferSplit(width, height);
+        /* this.defaultTexture = createGBufferSplit(width, height);
+          this.normalTexture = createGBufferSplit(width, height);
+          this.albedoTexture = createGBufferSplit(width, height);*/
+        this.gbuffer = new THREE.WebGLRenderTarget(width, height, {
+            count: 4,
+            format: THREE.RGBAFormat,
+            type: THREE.HalfFloatType,
+            minFilter: THREE.NearestFilter,
+            magFilter: THREE.NearestFilter,
+        });
+        this.gbuffer.depthTexture = new THREE.DepthTexture(width, height, THREE.UnsignedIntType);
         this.meshNormalMaterial = new THREE.MeshNormalMaterial();
         this.bluenoise = new THREE.DataTexture(
             bluenoiseBits,
@@ -152,13 +159,15 @@ class N8GIPass extends Pass {
              vblur.uniforms.v.value = blurSize;
              blurs.push([hblur, vblur]);
          }*/
+
+
         this.horizontalQuad = new FullScreenQuad(new THREE.ShaderMaterial(HorizontalBlurShader));
         this.verticalQuad = new FullScreenQuad(new THREE.ShaderMaterial(VerticalBlurShader));
         this.effectCompositer = new FullScreenQuad(new THREE.ShaderMaterial(EffectCompositer));
         this.voxelModule.updateVoxels();
         this.n8aopass = new N8AOPass(scene, camera, this.width, this.height);
         this.n8aopass.configuration.autoRenderBeauty = false;
-        this.n8aopass.beautyRenderTarget = this.defaultTexture;
+        this.n8aopass.beautyRenderTarget = this.gbuffer;
         this.n8aopass.configuration.gammaCorrection = false;
         //  n8aopass.configuration.aoSamples = 64;
         //  n8aopass.configuration.denoiseRadius = 3;
@@ -171,13 +180,49 @@ class N8GIPass extends Pass {
             type: THREE.FloatType,
             internalFormat: 'R11F_G11F_B10F'
         });
+        this.objectGBufferMaterials = new Map();
+
+        this.voxelModule.children.forEach(child => {
+            const newGBufferMaterial = child.material.clone();
+            newGBufferMaterial.onBeforeCompile = (shader) => {
+                shader.fragmentShader = "layout(location = 1) out vec4 gNormal;\nlayout(location = 2) out vec4 gAlbedo;\nlayout(location = 3) out vec4 gMaterial;\n" + shader.fragmentShader;
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    "#include <dithering_fragment>",
+                    `
+                    #include <dithering_fragment>
+                    gNormal = vec4(0.5 + 0.5 * normal, 1.0);
+                    gAlbedo = vec4(diffuseColor);
+                    gMaterial = vec4(metalness, roughness, 0.0, 0.0);
+                    `);
+            };
+
+            // child.material = newGBufferMaterial;
+
+            this.objectGBufferMaterials.set(child, newGBufferMaterial);
+            child.material = new Proxy(child.material, {
+                set: (target, propName, value) => {
+                    /*const oldProp = target[propName];
+                    target[propName] = value;
+                    if (propName === "envMapIntensity") {
+                        newGBufferMaterial.envMapIntensity = value;
+                    }*/
+                    target[propName] = value;
+                    newGBufferMaterial[propName] = value;
+                    return true;
+                },
+                get: (target, propName) => {
+                    return target[propName];
+                }
+            });
+        });
     }
     setSize(width, height) {
         this.width = width;
         this.height = height;
-        this.defaultTexture.setSize(width, height);
-        this.normalTexture.setSize(width, height);
-        this.albedoTexture.setSize(width, height);
+        /* this.defaultTexture.setSize(width, height);
+         this.normalTexture.setSize(width, height);
+         this.albedoTexture.setSize(width, height);*/
+        this.gbuffer.setSize(width, height);
         this.writeTargetInternal.setSize(width, height);
         this.readTargetInternal.setSize(width, height);
         this.n8aoRenderTarget.setSize(width, height);
@@ -186,32 +231,22 @@ class N8GIPass extends Pass {
     render(renderer, writeBuffer, readBuffer, deltaTime, maskActive) {
         this.voxelModule.update();
         this.scene.updateMatrixWorld();
-        this.scene.overrideMaterial = this.meshNormalMaterial;
-        renderer.setRenderTarget(this.normalTexture);
-        renderer.clear();
-        renderer.render(this.scene, this.camera);
-        this.scene.overrideMaterial = null;
-        const oldIntensities = new Map();
-        this.scene.traverse((obj) => {
-            if (obj.isLight) {
-                oldIntensities.set(obj, obj.intensity);
-                obj.intensity = 0;
-            }
-        });
-        this.albedoLight.intensity = (Math.PI * Math.PI) / (1 - 1 / Math.PI);
-        renderer.setRenderTarget(this.albedoTexture);
-        renderer.clear();
-        renderer.render(this.scene, this.camera);
-        this.scene.traverse((obj) => {
-            if (obj.isLight) {
-                obj.intensity = oldIntensities.get(obj);
-            }
-        });
-        this.albedoLight.intensity = 0;
         renderer.shadowMap.needsUpdate = true;
-        renderer.setRenderTarget(this.defaultTexture);
+        renderer.setRenderTarget(this.gbuffer);
         renderer.clear();
+        const oldBackground = this.scene.background;
+        this.scene.background = null;
+        const oldMaterials = new Map();
+        this.voxelModule.children.forEach(child => {
+            oldMaterials.set(child, child.material);
+            child.material = this.objectGBufferMaterials.get(child);
+        });
         renderer.render(this.scene, this.camera);
+        this.scene.background = oldBackground;
+        this.voxelModule.children.forEach(child => {
+            child.material = oldMaterials.get(child);
+        });
+
 
         this.n8aopass.render(
             renderer,
@@ -231,10 +266,10 @@ class N8GIPass extends Pass {
             this.voxelModule.setUniform(key, uniforms[key].value);
         });
         this.camera.updateMatrixWorld();
-        this.effectQuad.material.uniforms["sceneDiffuse"].value = this.defaultTexture.texture;
-        this.effectQuad.material.uniforms["sceneDepth"].value = this.defaultTexture.depthTexture;
-        this.effectQuad.material.uniforms["sceneNormal"].value = this.normalTexture.texture;
-        this.effectQuad.material.uniforms["sceneAlbedo"].value = this.albedoTexture.texture;
+        this.effectQuad.material.uniforms["sceneDiffuse"].value = this.gbuffer.textures[0];
+        this.effectQuad.material.uniforms["sceneDepth"].value = this.gbuffer.depthTexture;
+        this.effectQuad.material.uniforms["sceneNormal"].value = this.gbuffer.textures[1];
+        this.effectQuad.material.uniforms["sceneAlbedo"].value = this.gbuffer.textures[2];
         this.effectQuad.material.uniforms["bluenoise"].value = this.bluenoise;
         this.effectQuad.material.uniforms["skybox"].value = this.scene.background;
         this.effectQuad.material.uniforms["voxelTexture"].value = this.voxelModule.getIndexTexture();
@@ -254,11 +289,6 @@ class N8GIPass extends Pass {
         this.effectQuad.material.uniforms['debugVoxels'].value = this.configuration.voxelsOnly;
         this.effectQuad.material.uniforms['samples'].value = this.configuration.samples;
 
-        /*renderer.setRenderTarget(
-            this.renderToScreen ? null :
-            writeBuffer
-        );
-        this.effectQuad.render(renderer);*/
         if (this.configuration.voxelsOnly) {
             renderer.setRenderTarget(
                 this.renderToScreen ? null :
@@ -271,72 +301,46 @@ class N8GIPass extends Pass {
         renderer.setRenderTarget(this.writeTargetInternal);
         this.effectQuad.render(renderer);
 
-        this.horizontalQuad.material.uniforms["sceneDepth"].value = this.defaultTexture.depthTexture;
-        this.horizontalQuad.material.uniforms["normalTexture"].value = this.normalTexture.texture;
+        this.horizontalQuad.material.uniforms["sceneDepth"].value = this.gbuffer.depthTexture;
+        this.horizontalQuad.material.uniforms["normalTexture"].value = this.gbuffer.textures[1];
         this.horizontalQuad.material.uniforms["resolution"].value = new THREE.Vector2(this.width, this.height);
         this.horizontalQuad.material.uniforms["projectionMatrixInv"].value = this.camera.projectionMatrixInverse;
         this.horizontalQuad.material.uniforms["viewMatrixInv"].value = this.camera.matrixWorld;
-        this.verticalQuad.material.uniforms["sceneDepth"].value = this.defaultTexture.depthTexture;
-        this.verticalQuad.material.uniforms["normalTexture"].value = this.normalTexture.texture;
+        this.verticalQuad.material.uniforms["sceneDepth"].value = this.gbuffer.depthTexture;
+        this.verticalQuad.material.uniforms["normalTexture"].value = this.gbuffer.textures[1];
         this.verticalQuad.material.uniforms["resolution"].value = new THREE.Vector2(this.width, this.height);
         this.verticalQuad.material.uniforms["projectionMatrixInv"].value = this.camera.projectionMatrixInverse;
         this.verticalQuad.material.uniforms["viewMatrixInv"].value = this.camera.matrixWorld;
         if (!this.configuration.voxelsOnly && this.configuration.denoise) {
             const blurnums = [16, 4, 1];
             for (let i = 0; i < blurnums.length; i++) {
-                /*  this.horizontalQuad.material.uniforms["h"].value = blurnums[i];
-                  this.verticalQuad.material.uniforms["v"].value = blurnums[i];
-                  renderer.setRenderTarget(this.readTargetInternal);
-                  this.horizontalQuad.render(renderer);
-                  this.verticalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
-                  renderer.setRenderTarget(this.writeTargetInternal);
-                  this.verticalQuad.render(renderer);*/
-                if (i % 2 == 0) {
-                    [this.writeTargetInternal, this.readTargetInternal] = [this.readTargetInternal, this.writeTargetInternal];
-                    this.horizontalQuad.material.uniforms["h"].value = blurnums[i] * this.configuration.denoiseStrength;
-                    this.horizontalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
-                    renderer.setRenderTarget(this.writeTargetInternal);
-                    this.horizontalQuad.render(renderer);
-                    [this.writeTargetInternal, this.readTargetInternal] = [this.readTargetInternal, this.writeTargetInternal];
-                    this.verticalQuad.material.uniforms["v"].value = blurnums[i] * this.configuration.denoiseStrength;
-                    this.verticalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
-                    renderer.setRenderTarget(this.writeTargetInternal);
-                    this.verticalQuad.render(renderer);
-                } else {
-                    [this.writeTargetInternal, this.readTargetInternal] = [this.readTargetInternal, this.writeTargetInternal];
-                    this.verticalQuad.material.uniforms["v"].value = blurnums[i] * this.configuration.denoiseStrength;
-                    this.verticalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
-                    renderer.setRenderTarget(this.writeTargetInternal);
-                    this.verticalQuad.render(renderer);
-                    [this.writeTargetInternal, this.readTargetInternal] = [this.readTargetInternal, this.writeTargetInternal];
-                    this.horizontalQuad.material.uniforms["h"].value = blurnums[i] * this.configuration.denoiseStrength;
-                    this.horizontalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
-                    renderer.setRenderTarget(this.writeTargetInternal);
-                    this.horizontalQuad.render(renderer);
-
-                }
+                // if (i % 2 == 0) {
+                [this.writeTargetInternal, this.readTargetInternal] = [this.readTargetInternal, this.writeTargetInternal];
+                this.horizontalQuad.material.uniforms["h"].value = blurnums[i] * this.configuration.denoiseStrength;
+                this.horizontalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
+                renderer.setRenderTarget(this.writeTargetInternal);
+                this.horizontalQuad.render(renderer);
+                [this.writeTargetInternal, this.readTargetInternal] = [this.readTargetInternal, this.writeTargetInternal];
+                this.verticalQuad.material.uniforms["v"].value = blurnums[i] * this.configuration.denoiseStrength;
+                this.verticalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
+                renderer.setRenderTarget(this.writeTargetInternal);
+                this.verticalQuad.render(renderer);
 
             }
         }
-
-        /*  effectCompositer.uniforms["sceneDiffuse"].value = defaultTexture.texture;
-          effectCompositer.uniforms["sceneAlbedo"].value = albedoTexture.texture;
-          effectCompositer.uniforms["sceneDepth"].value = defaultTexture.depthTexture;
-          effectCompositer.uniforms["sceneAO"].value = n8aoRenderTarget.texture;
-          effectCompositer.uniforms["voxelTexture"].value = voxelModule.getVoxelRenderTarget().texture;
-          effectCompositer.uniforms['giStrengthMultiplier'].value = effectController.giStrength * (effectController.useSimpleEnvmap && !effectController.giOnly ? 0.0 : 1.0);
-          effectCompositer.uniforms['giOnly'].value = effectController.giOnly;
-          effectCompositer.uniforms['aoEnabled'].value = effectController.aoEnabled;*/
-
-        this.effectCompositer.material.uniforms["sceneDiffuse"].value = this.defaultTexture.texture;
-        this.effectCompositer.material.uniforms["sceneAlbedo"].value = this.albedoTexture.texture;
-        this.effectCompositer.material.uniforms["sceneDepth"].value = this.defaultTexture.depthTexture;
+        this.effectCompositer.material.uniforms["cameraPos"].value = this.camera.getWorldPosition(new THREE.Vector3());
+        this.effectCompositer.material.uniforms["viewMatrixInv"].value = this.camera.matrixWorld;
+        this.effectCompositer.material.uniforms["projectionMatrixInv"].value = this.camera.projectionMatrixInverse;
+        this.effectCompositer.material.uniforms["sceneDiffuse"].value = this.gbuffer.textures[0];
+        this.effectCompositer.material.uniforms["sceneAlbedo"].value = this.gbuffer.textures[2];
+        this.effectCompositer.material.uniforms["sceneDepth"].value = this.gbuffer.depthTexture;
         this.effectCompositer.material.uniforms["sceneAO"].value = this.n8aoRenderTarget.texture;
         this.effectCompositer.material.uniforms["tDiffuse"].value = this.writeTargetInternal.texture;
         this.effectCompositer.material.uniforms["voxelTexture"].value = this.voxelModule.getIndexTexture();
         this.effectCompositer.material.uniforms["giStrengthMultiplier"].value = this.configuration.giStrength * (!this.configuration.useSimpleEnvmap);
         this.effectCompositer.material.uniforms["giOnly"].value = this.configuration.giOnly;
-        this.effectCompositer.material.uniforms["aoEnabled"].value = true;
+        this.effectCompositer.material.uniforms["background"].value = this.scene.background;
+        this.effectCompositer.material.uniforms["aoEnabled"].value = this.configuration.aoEnabled;
 
         renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
         this.effectCompositer.render(renderer);
