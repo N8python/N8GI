@@ -6,6 +6,7 @@ const HorizontalBlurShader = {
 
         'tDiffuse': { value: null },
         'sceneDepth': { value: null },
+        'sceneMaterial': { value: null },
         'blurSharp': { value: 0 },
         'depthBias': { value: 1.0 },
         'near': { value: 0 },
@@ -29,6 +30,7 @@ const HorizontalBlurShader = {
     fragmentShader: /* glsl */ `
 		uniform sampler2D tDiffuse;
 		uniform sampler2D sceneDepth;
+		uniform sampler2D sceneMaterial;
 		uniform sampler2D normalTexture;
 		uniform float blurSharp;
 		uniform float h;
@@ -112,12 +114,17 @@ vec3 getWorldPos(float depth, vec2 coord) {
 			float[9] weights =  float[9](0.051, 0.0918, 0.12245, 0.1531, 0.1633, 0.1531, 0.12245, 0.0918, 0.051);
 			float weightSum = 0.0;
 			float d = texture2D(sceneDepth, vUv).x;
+			if (d == 1.0) {
+				gl_FragColor = texture2D(tDiffuse, vUv);
+				return;
+			}
 			vec3 myColor = texture2D(tDiffuse, vUv).rgb;
 			float b = texture2D(tDiffuse, vUv).x;
 			float uvDepth = linearize_depth(d, 0.1, 1000.0);
 			vec3 uvWorldPos = getWorldPos(d, vUv);
-			vec3 normal =  normalize((viewMatrixInv * normalize(vec4((texture2D(normalTexture, vUv).rgb - 0.5) * 2.0, 0.0))).xyz);
-			float radius = h / resolution.x; //max(h * (1.0 - d) * (-blurSharp * pow(b - 0.5, 2.0) + 1.0), blurThreshold / resolution.x);
+			vec3 normal =  normalize((viewMatrixInv * normalize(vec4(texture2D(normalTexture, vUv).rgb, 0.0))).xyz);
+			float roughness = texture2D(sceneMaterial, vUv).g;
+			float radius = h / resolution.x * roughness; //max(h * (1.0 - d) * (-blurSharp * pow(b - 0.5, 2.0) + 1.0), blurThreshold / resolution.x);
 			vec3 planeNormal = normal;
 			float planeConstant = -dot(uvWorldPos, normal);
 			for(float i = -4.0; i <= 4.0; i++) {

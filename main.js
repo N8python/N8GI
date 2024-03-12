@@ -122,6 +122,17 @@ async function main() {
     tKnot4.receiveShadow = true;
     scene.add(tKnot4);
 
+    const metalSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(10, 32, 32),
+        new THREE.MeshStandardMaterial({
+            color: new THREE.Color(1, 1, 1),
+            metalness: 1.0,
+            roughness: 0.0
+        })
+    );
+    metalSphere.position.y = 10;
+    scene.add(metalSphere);
+
     sponza.scale.set(10, 10, 10);
     scene.add(sponza);
 
@@ -169,7 +180,7 @@ async function main() {
         giOnly: false,
         denoise: true,
         denoiseStrength: 1.0,
-        roughness: 1.0,
+        roughness: 0.0,
         giStrength: Math.PI,
         useSimpleEnvmap: false,
         samples: 1,
@@ -220,6 +231,7 @@ async function main() {
     gui.add(effectController, "aoEnabled");
 
     function animate() {
+        metalSphere.material.roughness = effectController.roughness;
         tKnot.rotation.y += 0.01;
         tKnot.rotation.x += 0.01;
         tKnot.position.x = Math.sin(performance.now() / 1000) * 75;

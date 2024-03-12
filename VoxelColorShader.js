@@ -299,6 +299,22 @@ const VoxelColorShader = {
 
 	}
         uniform float time;
+        uniform sampler2D sceneTex;
+        uniform sampler2D sceneDepth;
+        uniform mat4 projMat;
+        uniform mat4 viewMat;
+        uniform mat4 projectionMatrixInv;
+        uniform mat4 viewMatrixInv;
+        vec3 getWorldPos(float depth, vec2 coord) {
+            float z = depth * 2.0 - 1.0;
+            vec4 clipSpacePosition = vec4(coord * 2.0 - 1.0, z, 1.0);
+            vec4 viewSpacePosition = projectionMatrixInv * clipSpacePosition;
+            // Perspective division
+           vec4 worldSpacePosition = viewSpacePosition;
+           worldSpacePosition.xyz /= worldSpacePosition.w;
+           worldSpacePosition = (viewMatrixInv * vec4(worldSpacePosition.xyz, 1.0));
+            return worldSpacePosition.xyz;
+        }
         uniform highp isampler3D voxelTex;
         uniform highp sampler2D posTex;
         uniform highp sampler2D normalTex;
@@ -376,7 +392,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
       }
       float packThreeBytes(vec3 bytes) {
         // Ensure the input is clamped to the valid range [0, 255]
-        bytes = clamp(bytes * 254.99, 0.0, 255.0);
+        bytes = clamp(bytes, 0.0, 1.0) * 254.0;
         
         // Combine the three bytes into one integer
         int packedInt = (int(bytes.x) << 16) | (int(bytes.y) << 8) | int(bytes.z);
@@ -504,11 +520,15 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                 accumulatedLightBack += emissive;
 
 
+                
+
+
                 vec3 center =                     (posA + posB + posC) / 3.0;
                 gl_FragColor =
                 vec4(
                    packThreeBytes(vec3(
-                    accumulatedLight //randomColor(100.0*float(meshIndex))
+                    accumulatedLight
+                    //randomColor(100.0*float(meshIndex)) 
                    )),
                    packThreeBytes(vec3(
                     accumulatedLightBack //randomColor(100.0*float(meshIndex))

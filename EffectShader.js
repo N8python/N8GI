@@ -24,7 +24,8 @@ const EffectShader = {
         'voxelAmount': { value: new THREE.Vector3(1, 1, 1) },
         'debugVoxels': { value: false },
         'roughness': { value: 1.0 },
-        'samples': { value: 1.0 }
+        'samples': { value: 1.0 },
+        'sceneMaterial': { value: null }
     },
 
     vertexShader: /* glsl */ `
@@ -40,6 +41,7 @@ const EffectShader = {
     uniform highp sampler2D sceneDepth;
     uniform highp sampler2D sceneAlbedo;
     uniform highp sampler2D sceneNormal;
+    uniform highp sampler2D sceneMaterial;
     uniform highp sampler2D bluenoise;
     uniform highp isampler3D voxelTexture;
     uniform highp samplerCube skybox;
@@ -68,6 +70,7 @@ const EffectShader = {
       highp ivec3 voxelPos;
       bool hit;
     };
+   
       Ray createRay(vec3 origin, vec3 direction) {
         Ray ray;
         ray.origin = origin;
@@ -282,7 +285,7 @@ vec3 takeSample(
       reflectedColor = dot(voxNormal, -ray.direction) > 0.0 ? color : backColor;
 
     } else {
-      reflectedColor = textureLod(skybox, ray.direction, 100.0).rgb / 3.14159;
+      reflectedColor = textureLod(skybox, ray.direction, 9.0 * roughness).rgb / 3.14159;
     }
     return reflectedColor;
 }
@@ -294,7 +297,7 @@ vec3 takeSample(
       float depth = texture(sceneDepth, vUv).r;
       vec3 worldPos = (viewMatrixInv * vec4(getWorldPos(depth, vUv), 1.0)).xyz;
       vec3 normal = normalize((viewMatrixInv * vec4(
-        texture2D(sceneNormal, vUv).rgb * 2.0 - 1.0,
+        texture2D(sceneNormal, vUv).rgb,
          0.0)).xyz);
 
 
@@ -310,9 +313,10 @@ vec3 takeSample(
         1.324717957244746
       );
       vec3 reflectedColor = vec3(0.0);
+      float r = texture2D(sceneMaterial, vUv).g;
       for(float i = 0.0; i < samples; i++) {
         vec2 s = fract(initialSample + i * harmoniousNumbers);
-        reflectedColor += takeSample(cameraPos, worldPos, normal, viewDir, s, roughness);      
+        reflectedColor += takeSample(cameraPos, worldPos, normal, viewDir, s, r);      
       }
       reflectedColor /= samples;
 
@@ -323,7 +327,6 @@ vec3 takeSample(
     float giStrength = 16.0;
 
      gl_FragColor = vec4(reflectedColor, 1.0);
-      
 
 
 		}`

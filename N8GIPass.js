@@ -148,6 +148,13 @@ class N8GIPass extends Pass {
             type: THREE.FloatType,
             internalFormat: 'R11F_G11F_B10F'
         });
+        this.giTarget = new THREE.WebGLRenderTarget(this.width, this.height, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: 'RGB',
+            type: THREE.FloatType,
+            internalFormat: 'R11F_G11F_B10F'
+        });
 
         this.effectQuad = new FullScreenQuad(new THREE.ShaderMaterial(EffectShader));
         /* const blurs = [];
@@ -164,6 +171,25 @@ class N8GIPass extends Pass {
         this.horizontalQuad = new FullScreenQuad(new THREE.ShaderMaterial(HorizontalBlurShader));
         this.verticalQuad = new FullScreenQuad(new THREE.ShaderMaterial(VerticalBlurShader));
         this.effectCompositer = new FullScreenQuad(new THREE.ShaderMaterial(EffectCompositer));
+        this.copyQuad = new FullScreenQuad(new THREE.ShaderMaterial({
+            uniforms: {
+                tDiffuse: { value: null }
+            },
+            vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+            `,
+            fragmentShader: `
+            uniform sampler2D tDiffuse;
+            varying vec2 vUv;
+            void main() {
+                gl_FragColor = texture2D(tDiffuse, vUv);
+            }
+            `
+        }));
         this.voxelModule.updateVoxels();
         this.n8aopass = new N8AOPass(scene, camera, this.width, this.height);
         this.n8aopass.configuration.autoRenderBeauty = false;
@@ -190,9 +216,9 @@ class N8GIPass extends Pass {
                     "#include <dithering_fragment>",
                     `
                     #include <dithering_fragment>
-                    gNormal = vec4(0.5 + 0.5 * normal, 1.0);
+                    gNormal = vec4(normal, 1.0);
                     gAlbedo = vec4(diffuseColor);
-                    gMaterial = vec4(metalness, roughness, 0.0, 0.0);
+                    gMaterial = vec4(metalnessFactor, roughnessFactor, 0.0, 0.0);
                     `);
             };
 
@@ -223,12 +249,20 @@ class N8GIPass extends Pass {
          this.normalTexture.setSize(width, height);
          this.albedoTexture.setSize(width, height);*/
         this.gbuffer.setSize(width, height);
+        this.giTarget.setSize(width, height);
         this.writeTargetInternal.setSize(width, height);
         this.readTargetInternal.setSize(width, height);
         this.n8aoRenderTarget.setSize(width, height);
         this.n8aopass.setSize(width, height);
     }
     render(renderer, writeBuffer, readBuffer, deltaTime, maskActive) {
+        this.voxelModule.voxelColorShader.material.uniforms['sceneTex'].value = this.giTarget.texture;
+        this.voxelModule.voxelColorShader.material.uniforms['sceneDepth'].value = this.gbuffer.depthTexture;
+        this.voxelModule.voxelColorShader.material.uniforms['projMat'].value = this.camera.projectionMatrix;
+        this.voxelModule.voxelColorShader.material.uniforms['viewMat'].value = this.camera.matrixWorldInverse;
+        this.voxelModule.voxelColorShader.material.uniforms['projectionMatrixInv'].value = this.camera.projectionMatrixInverse;
+        this.voxelModule.voxelColorShader.material.uniforms['viewMatrixInv'].value = this.camera.matrixWorld;
+
         this.voxelModule.update();
         this.scene.updateMatrixWorld();
         renderer.shadowMap.needsUpdate = true;
@@ -270,6 +304,7 @@ class N8GIPass extends Pass {
         this.effectQuad.material.uniforms["sceneDepth"].value = this.gbuffer.depthTexture;
         this.effectQuad.material.uniforms["sceneNormal"].value = this.gbuffer.textures[1];
         this.effectQuad.material.uniforms["sceneAlbedo"].value = this.gbuffer.textures[2];
+        this.effectQuad.material.uniforms["sceneMaterial"].value = this.gbuffer.textures[3];
         this.effectQuad.material.uniforms["bluenoise"].value = this.bluenoise;
         this.effectQuad.material.uniforms["skybox"].value = this.scene.background;
         this.effectQuad.material.uniforms["voxelTexture"].value = this.voxelModule.getIndexTexture();
@@ -302,11 +337,13 @@ class N8GIPass extends Pass {
         this.effectQuad.render(renderer);
 
         this.horizontalQuad.material.uniforms["sceneDepth"].value = this.gbuffer.depthTexture;
+        this.horizontalQuad.material.uniforms["sceneMaterial"].value = this.gbuffer.textures[3];
         this.horizontalQuad.material.uniforms["normalTexture"].value = this.gbuffer.textures[1];
         this.horizontalQuad.material.uniforms["resolution"].value = new THREE.Vector2(this.width, this.height);
         this.horizontalQuad.material.uniforms["projectionMatrixInv"].value = this.camera.projectionMatrixInverse;
         this.horizontalQuad.material.uniforms["viewMatrixInv"].value = this.camera.matrixWorld;
         this.verticalQuad.material.uniforms["sceneDepth"].value = this.gbuffer.depthTexture;
+        this.verticalQuad.material.uniforms["sceneMaterial"].value = this.gbuffer.textures[3];
         this.verticalQuad.material.uniforms["normalTexture"].value = this.gbuffer.textures[1];
         this.verticalQuad.material.uniforms["resolution"].value = new THREE.Vector2(this.width, this.height);
         this.verticalQuad.material.uniforms["projectionMatrixInv"].value = this.camera.projectionMatrixInverse;
@@ -341,9 +378,14 @@ class N8GIPass extends Pass {
         this.effectCompositer.material.uniforms["giOnly"].value = this.configuration.giOnly;
         this.effectCompositer.material.uniforms["background"].value = this.scene.background;
         this.effectCompositer.material.uniforms["aoEnabled"].value = this.configuration.aoEnabled;
-
+        //  renderer.setRenderTarget(this.giTarget);
+        //   this.effectCompositer.render(renderer);
+        renderer.setRenderTarget(this.giTarget);
+        this.copyQuad.material.uniforms["tDiffuse"].value = this.writeTargetInternal.texture;
+        this.copyQuad.render(renderer);
         renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
         this.effectCompositer.render(renderer);
+
 
 
 
