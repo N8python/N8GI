@@ -244,7 +244,7 @@ vec3 unpackThreeBytes(float packedFloat) {
 vec4 getSampleDir(vec3 diskInfo, vec3 normal, vec3 viewDir, vec3 worldPos, float roughness, float metalness) {
   float f0 = 0.04 + 0.96 * metalness;
   float schlick = f0 + (1.0 - f0) * pow(1.0 - dot(-viewDir, normal), 5.0);
-  if (diskInfo.b > schlick) {
+  if (diskInfo.b > schlick || debugVoxels) {
 
    vec3 reflectedDir;
    diskInfo.r = sqrt(diskInfo.r);

@@ -90,10 +90,15 @@ export class VoxelModule {
         }
 
         const materialInfoBuffer = new Uint32Array(materials.length * 4);
+        this.materials = materials;
+        this.materialInfoBuffer = materialInfoBuffer;
         for (let i = 0; i < materials.length; i++) {
             materialInfoBuffer[i * 4] = packRGBToUint32(new THREE.Vector3(materials[i].emissive.r, materials[i].emissive.g, materials[i].emissive.b));
             materialInfoBuffer[i * 4 + 1] = packRGBToUint32(new THREE.Vector3(materials[i].color.r, materials[i].color.g, materials[i].color.b));
-            materialInfoBuffer[i * 4 + 2] = packRGBToUint32(new THREE.Vector3(materials[i].metalness, materials[i].roughness, 0.0));
+            materialInfoBuffer[i * 4 + 2] = packRGBToUint32(new THREE.Vector3(
+                materials[i].metalnessMap ? 0 : materials[i].metalness,
+                materials[i].roughnessMap ? 0 : materials[i].roughness,
+                0.0));
             materialInfoBuffer[i * 4 + 3] = materials[i].mapIndex;
         }
 
@@ -365,5 +370,19 @@ export class VoxelModule {
     }
     setUniform(key, value) {
         this.voxelColorShader.material.uniforms[key].value = value;
+    }
+    updateMaterialDataTexture() {
+        const materials = this.materials;
+        const materialInfoBuffer = this.materialInfoBuffer;
+        for (let i = 0; i < materials.length; i++) {
+            materialInfoBuffer[i * 4] = packRGBToUint32(new THREE.Vector3(materials[i].emissive.r, materials[i].emissive.g, materials[i].emissive.b));
+            materialInfoBuffer[i * 4 + 1] = packRGBToUint32(new THREE.Vector3(materials[i].color.r, materials[i].color.g, materials[i].color.b));
+            materialInfoBuffer[i * 4 + 2] = packRGBToUint32(new THREE.Vector3(
+                materials[i].metalnessMap ? 0 : materials[i].metalness,
+                materials[i].roughnessMap ? 0 : materials[i].roughness,
+                0.0));
+            materialInfoBuffer[i * 4 + 3] = materials[i].mapIndex;
+        }
+        this.materialDataTexture.needsUpdate = true;
     }
 }

@@ -10,6 +10,7 @@ const EffectCompositer = {
         tDiffuse: { value: null },
         tSpecular: { value: null },
         giStrengthMultiplier: { value: 1.0 },
+        specularStrengthMultiplier: { value: 1.0 },
         giOnly: { value: false },
         aoEnabled: { value: true },
         background: { value: null },
@@ -37,6 +38,7 @@ const EffectCompositer = {
     uniform mat4 projectionMatrixInv;
     uniform vec3 cameraPos;
     uniform float giStrengthMultiplier;
+    uniform float specularStrengthMultiplier;
     uniform bool aoEnabled;
     uniform bool giOnly;
     varying vec2 vUv;
@@ -64,7 +66,8 @@ const EffectCompositer = {
         vec4 denoised = texture2D(tDiffuse, vUv);
         vec4 specular = texture2D(tSpecular, vUv);
         float giStrength = giStrengthMultiplier;
-        gl_FragColor = vec4((diffuse.rgb + denoised.rgb * albedo.rgb * giStrength + specular.rgb * albedo.rgb) * ao.rgb, 1.0);
+        float specularStrength = specularStrengthMultiplier;
+        gl_FragColor = vec4((diffuse.rgb + denoised.rgb * albedo.rgb * giStrength + specular.rgb * albedo.rgb * specularStrength) * ao.rgb, 1.0);
         if (giOnly) {
             gl_FragColor = vec4(giStrength * denoised.rgb * ao.rgb, 1.0);
         }

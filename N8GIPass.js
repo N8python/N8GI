@@ -27,6 +27,7 @@ class N8GIPass extends Pass {
             denoiseStrength: 1.0,
             roughness: 1.0,
             giStrength: 1.0,
+            specularStrength: 1.0,
             useSimpleEnvmap: false,
             samples: 1,
             aoEnabled: true
@@ -264,6 +265,7 @@ class N8GIPass extends Pass {
         this.voxelModule.voxelColorShader.material.uniforms['viewMat'].value = this.camera.matrixWorldInverse;
         this.voxelModule.voxelColorShader.material.uniforms['projectionMatrixInv'].value = this.camera.projectionMatrixInverse;
         this.voxelModule.voxelColorShader.material.uniforms['viewMatrixInv'].value = this.camera.matrixWorld;
+        this.voxelModule.updateMaterialDataTexture();
 
         this.voxelModule.update();
         this.scene.updateMatrixWorld();
@@ -380,6 +382,7 @@ class N8GIPass extends Pass {
         this.effectCompositer.material.uniforms["tSpecular"].value = this.writeTargetInternal.textures[1];
         this.effectCompositer.material.uniforms["voxelTexture"].value = this.voxelModule.getIndexTexture();
         this.effectCompositer.material.uniforms["giStrengthMultiplier"].value = this.configuration.giStrength * (!this.configuration.useSimpleEnvmap);
+        this.effectCompositer.material.uniforms["specularStrengthMultiplier"].value = this.configuration.specularStrength * (!this.configuration.useSimpleEnvmap);
         this.effectCompositer.material.uniforms["giOnly"].value = this.configuration.giOnly;
         this.effectCompositer.material.uniforms["background"].value = this.scene.background;
         this.effectCompositer.material.uniforms["aoEnabled"].value = this.configuration.aoEnabled;

@@ -183,6 +183,7 @@ async function main() {
         roughness: 0.0,
         metalness: 1.0,
         giStrength: Math.PI,
+        specularStrength: 1.0,
         useSimpleEnvmap: false,
         samples: 1,
         aoSamples: 16,
@@ -224,6 +225,7 @@ async function main() {
     gui.add(effectController, "samples", 1, 16, 1);
     gui.add(effectController, "denoiseStrength", 0.0, 1.0);
     gui.add(effectController, "giStrength", 0.0, Math.PI);
+    gui.add(effectController, "specularStrength", 0.0, Math.PI);
     gui.add(effectController, "roughness", 0.0, 1.0);
     gui.add(effectController, "metalness", 0.0, 1.0);
     gui.add(effectController, "aoSamples", 1, 64, 1);
@@ -245,6 +247,11 @@ async function main() {
         tKnot3.rotation.x += 0.01;
         tKnot4.rotation.y += 0.01;
         tKnot4.rotation.x += 0.01;
+        tKnot3.material.emissive = new THREE.Color().setHSL(
+            0.5 * Math.sin(performance.now() / 2500) + 0.5,
+            1,
+            0.5
+        );
         n8giPass.configuration.samples = effectController.samples;
         n8giPass.configuration.giOnly = effectController.giOnly;
         n8giPass.configuration.voxelsOnly = effectController.voxelsOnly;
@@ -252,6 +259,7 @@ async function main() {
         n8giPass.configuration.denoiseStrength = effectController.denoiseStrength;
         n8giPass.configuration.roughness = effectController.roughness;
         n8giPass.configuration.giStrength = effectController.giStrength;
+        n8giPass.configuration.specularStrength = effectController.specularStrength;
         n8giPass.configuration.useSimpleEnvmap = effectController.useSimpleEnvmap;
         n8giPass.configuration.aoEnabled = effectController.aoEnabled;
         n8giPass.n8aopass.configuration.aoEnabled = effectController.aoEnabled;

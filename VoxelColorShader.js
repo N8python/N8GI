@@ -511,8 +511,8 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                         incidentLight *= shadow;
                     #endif
 
-                    accumulatedLight += (directionalLights[ i ].color / 3.14159) * incidentLight * sampledTexel.rgb * color;
-                    accumulatedLightBack += (directionalLights[ i ].color / 3.14159) * incidentLightBack * sampledTexel.rgb * color;
+                    accumulatedLight += (directionalLights[ i ].color / 3.14159) * incidentLight * sampledTexel.rgb * color * (1.0 - metalness);
+                    accumulatedLightBack += (directionalLights[ i ].color / 3.14159) * incidentLightBack * sampledTexel.rgb * color * (1.0 - metalness);
                 }
                 #pragma unroll_loop_end
 
