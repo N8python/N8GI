@@ -181,6 +181,7 @@ async function main() {
         denoise: true,
         denoiseStrength: 1.0,
         roughness: 0.0,
+        metalness: 1.0,
         giStrength: Math.PI,
         useSimpleEnvmap: false,
         samples: 1,
@@ -224,6 +225,7 @@ async function main() {
     gui.add(effectController, "denoiseStrength", 0.0, 1.0);
     gui.add(effectController, "giStrength", 0.0, Math.PI);
     gui.add(effectController, "roughness", 0.0, 1.0);
+    gui.add(effectController, "metalness", 0.0, 1.0);
     gui.add(effectController, "aoSamples", 1, 64, 1);
     gui.add(effectController, "aoRadius", 1, 10, 1);
     gui.add(effectController, "denoiseRadius", 1, 12, 1);
@@ -232,6 +234,7 @@ async function main() {
 
     function animate() {
         metalSphere.material.roughness = effectController.roughness;
+        metalSphere.material.metalness = effectController.metalness;
         tKnot.rotation.y += 0.01;
         tKnot.rotation.x += 0.01;
         tKnot.position.x = Math.sin(performance.now() / 1000) * 75;

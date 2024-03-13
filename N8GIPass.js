@@ -138,7 +138,8 @@ class N8GIPass extends Pass {
             depthBuffer: false,
             format: 'RGB',
             type: THREE.FloatType,
-            internalFormat: 'R11F_G11F_B10F'
+            internalFormat: 'R11F_G11F_B10F',
+            count: 2
         });
         this.readTargetInternal = new THREE.WebGLRenderTarget(this.width, this.height, {
             minFilter: THREE.LinearFilter,
@@ -146,7 +147,8 @@ class N8GIPass extends Pass {
             depthBuffer: false,
             format: 'RGB',
             type: THREE.FloatType,
-            internalFormat: 'R11F_G11F_B10F'
+            internalFormat: 'R11F_G11F_B10F',
+            count: 2
         });
         this.giTarget = new THREE.WebGLRenderTarget(this.width, this.height, {
             minFilter: THREE.LinearFilter,
@@ -354,12 +356,14 @@ class N8GIPass extends Pass {
                 // if (i % 2 == 0) {
                 [this.writeTargetInternal, this.readTargetInternal] = [this.readTargetInternal, this.writeTargetInternal];
                 this.horizontalQuad.material.uniforms["h"].value = blurnums[i] * this.configuration.denoiseStrength;
-                this.horizontalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
+                this.horizontalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.textures[0];
+                this.horizontalQuad.material.uniforms["tSpecular"].value = this.readTargetInternal.textures[1];
                 renderer.setRenderTarget(this.writeTargetInternal);
                 this.horizontalQuad.render(renderer);
                 [this.writeTargetInternal, this.readTargetInternal] = [this.readTargetInternal, this.writeTargetInternal];
                 this.verticalQuad.material.uniforms["v"].value = blurnums[i] * this.configuration.denoiseStrength;
-                this.verticalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.texture;
+                this.verticalQuad.material.uniforms["tDiffuse"].value = this.readTargetInternal.textures[0];
+                this.verticalQuad.material.uniforms["tSpecular"].value = this.readTargetInternal.textures[1];
                 renderer.setRenderTarget(this.writeTargetInternal);
                 this.verticalQuad.render(renderer);
 
@@ -372,7 +376,8 @@ class N8GIPass extends Pass {
         this.effectCompositer.material.uniforms["sceneAlbedo"].value = this.gbuffer.textures[2];
         this.effectCompositer.material.uniforms["sceneDepth"].value = this.gbuffer.depthTexture;
         this.effectCompositer.material.uniforms["sceneAO"].value = this.n8aoRenderTarget.texture;
-        this.effectCompositer.material.uniforms["tDiffuse"].value = this.writeTargetInternal.texture;
+        this.effectCompositer.material.uniforms["tDiffuse"].value = this.writeTargetInternal.textures[0];
+        this.effectCompositer.material.uniforms["tSpecular"].value = this.writeTargetInternal.textures[1];
         this.effectCompositer.material.uniforms["voxelTexture"].value = this.voxelModule.getIndexTexture();
         this.effectCompositer.material.uniforms["giStrengthMultiplier"].value = this.configuration.giStrength * (!this.configuration.useSimpleEnvmap);
         this.effectCompositer.material.uniforms["giOnly"].value = this.configuration.giOnly;
@@ -380,9 +385,9 @@ class N8GIPass extends Pass {
         this.effectCompositer.material.uniforms["aoEnabled"].value = this.configuration.aoEnabled;
         //  renderer.setRenderTarget(this.giTarget);
         //   this.effectCompositer.render(renderer);
-        renderer.setRenderTarget(this.giTarget);
-        this.copyQuad.material.uniforms["tDiffuse"].value = this.writeTargetInternal.texture;
-        this.copyQuad.render(renderer);
+        /* renderer.setRenderTarget(this.giTarget);
+         this.copyQuad.material.uniforms["tDiffuse"].value = this.writeTargetInternal.texture;
+         this.copyQuad.render(renderer);*/
         renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
         this.effectCompositer.render(renderer);
 

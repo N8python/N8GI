@@ -37,6 +37,7 @@ const EffectShader = {
 
     fragmentShader: /* glsl */ `
     #include <packing>
+    layout(location = 1) out vec4 specular;
 		uniform highp sampler2D sceneDiffuse;
     uniform highp sampler2D sceneDepth;
     uniform highp sampler2D sceneAlbedo;
@@ -240,11 +241,15 @@ vec3 unpackThreeBytes(float packedFloat) {
   return bytes / 255.0;
 }
 
-vec3 getSampleDir(vec2 diskInfo, vec3 normal, vec3 viewDir, vec3 worldPos, float roughness) {
-  vec3 reflectedDir = reflect(viewDir, normal);
-  diskInfo.r = sqrt(diskInfo.r);
+vec4 getSampleDir(vec3 diskInfo, vec3 normal, vec3 viewDir, vec3 worldPos, float roughness, float metalness) {
+  float f0 = 0.04 + 0.96 * metalness;
+  float schlick = f0 + (1.0 - f0) * pow(1.0 - dot(-viewDir, normal), 5.0);
+  if (diskInfo.b > schlick) {
 
-      vec2 diskPos = vec2(
+   vec3 reflectedDir;
+   diskInfo.r = sqrt(diskInfo.r);
+
+     vec2 diskPos = vec2(
         diskInfo.r * cos(diskInfo.g * 2.0 * 3.14159),
         diskInfo.r * sin(diskInfo.g * 2.0 * 3.14159)
       );
@@ -257,18 +262,43 @@ vec3 getSampleDir(vec2 diskInfo, vec3 normal, vec3 viewDir, vec3 worldPos, float
       vec3 tangent = normalize(cross(normal, helper));
       vec3 bitangent = cross(normal, tangent);
       mat3 TBN = mat3(tangent, bitangent, normal);
-       reflectedDir = normalize(mix(reflectedDir, normalize(TBN * hemisphereDir), roughness));
-       return reflectedDir;
+       reflectedDir = normalize(TBN * hemisphereDir);
+       return vec4(reflectedDir, 0.0);
+    } else {
+    float alpha = roughness * roughness;
+    float theta = atan(sqrt(
+      alpha * alpha * diskInfo.r / (1.0 - diskInfo.r)
+    ));
+    float phi = diskInfo.g * 2.0 * 3.14159;
+    vec3 hemisphereDir = vec3(
+      sin(theta) * cos(phi),
+      sin(theta) * sin(phi),
+      cos(theta)
+    );
+    vec3 helper = vec3(1.0, 0.0, 0.0);
+    if (abs(dot(helper, normal)) > 0.99) {
+      helper = vec3(0.0, 1.0, 0.0);
+    }
+    vec3 tangent = normalize(cross(normal, helper));
+    vec3 bitangent = cross(normal, tangent);
+    mat3 TBN = mat3(tangent, bitangent, normal);
+    vec3 hNormal = normalize(TBN * hemisphereDir);
+    vec3 reflectedDir = reflect(viewDir, hNormal);
+    return vec4(reflectedDir, 1.0);
+  }
+    
 }
-vec3 takeSample(
+vec4 takeSample(
   vec3 cameraPos,
   vec3 worldPos,
   vec3 normal,
   vec3 viewDir,
-  vec2 diskInfo,
-  float roughness
+  vec3 diskInfo,
+  float roughness,
+  float metalness
 ) {
-  vec3 reflectedDir = getSampleDir(diskInfo, normal, viewDir, worldPos, roughness);
+  vec4 sampleData = getSampleDir(diskInfo, normal, viewDir, worldPos, roughness, metalness);
+  vec3 reflectedDir = sampleData.rgb;
   vec3 voxelRatioResults = voxelAmount / boxSize;
   float voxelRatioMax = 1.0 / max(max(voxelRatioResults.x, voxelRatioResults.y), voxelRatioResults.z);
 
@@ -287,7 +317,7 @@ vec3 takeSample(
     } else {
       reflectedColor = textureLod(skybox, ray.direction, 9.0 * roughness).rgb / 3.14159;
     }
-    return reflectedColor;
+    return vec4(reflectedColor, sampleData.a);
 }
 		void main() {
       if (texture2D(sceneDepth, vUv).r == 1.0) {
@@ -304,32 +334,48 @@ vec3 takeSample(
 
       vec3 viewDir = normalize(worldPos - cameraPos);
 
-     vec2 initialSample = texture2D(
+     vec3 initialSample = texture2D(
         bluenoise,
         gl_FragCoord.xy / vec2(textureSize(bluenoise, 0).xy)
-      ).rg;
-      vec2 harmoniousNumbers = vec2(
+      ).rgb;
+      vec3 harmoniousNumbers = vec3(
         1.618033988749895,
-        1.324717957244746
+        1.324717957244746,
+        1.220744084605759
       );
-      vec3 reflectedColor = vec3(0.0);
-      float r = texture2D(sceneMaterial, vUv).g;
+    //  vec3 reflectedColor = vec3(0.0);
+    vec3 diffuseColor = vec3(0.0);
+    vec3 specularColor = vec3(0.0);
+    float diffuseSamples = 0.0;
+    float specularSamples = 0.0;
+      vec4 matData = texture2D(sceneMaterial, vUv);
+      float r = matData.g;
+      float m = matData.r;
       for(float i = 0.0; i < samples; i++) {
-        vec2 s = fract(initialSample + i * harmoniousNumbers);
-        reflectedColor += takeSample(cameraPos, worldPos, normal, viewDir, s, r);      
+        vec3 s = fract(initialSample + i * harmoniousNumbers);
+        //reflectedColor += takeSample(cameraPos, worldPos, normal, viewDir, s, r, m);  
+        vec4 sampleData = takeSample(cameraPos, worldPos, normal, viewDir, s, r, m);  
+        vec3 reflCol = sampleData.rgb;
+        if (sampleData.a == 0.0) {
+          diffuseColor += reflCol;
+          diffuseSamples += 1.0;
+        }
+        if (sampleData.a == 1.0) {
+          specularColor += reflCol;
+          specularSamples += 1.0;
+        }
       }
-      reflectedColor /= samples;
+    //  reflectedColor /= samples;
+    if (diffuseSamples > 0.0) {
+      diffuseColor /= diffuseSamples;
+    }
+    if (specularSamples > 0.0) {
+      specularColor /= specularSamples;
+    }
 
-    vec3 s = texture2D(
-      sceneDiffuse,
-      vUv
-    ).rgb;
-    float giStrength = 16.0;
-
-     gl_FragColor = vec4(reflectedColor, 1.0);
-
-
-		}`
+      gl_FragColor = vec4(diffuseColor, 1.0);
+      specular = vec4(specularColor, 1.0);
+  }`
 
 };
 

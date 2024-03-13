@@ -16,7 +16,8 @@ const HorizontalBlurShader = {
         'blurThreshold': { value: 0.25 },
         'normalTexture': { value: null },
         'projectionMatrixInv': { value: new THREE.Matrix4() },
-        'viewMatrixInv': { value: new THREE.Matrix4() }
+        'viewMatrixInv': { value: new THREE.Matrix4() },
+        "tSpecular": { value: null }
 
     },
 
@@ -28,7 +29,9 @@ const HorizontalBlurShader = {
 		}`,
 
     fragmentShader: /* glsl */ `
+	layout(location = 1) out vec4 specular;
 		uniform sampler2D tDiffuse;
+		uniform sampler2D tSpecular;
 		uniform sampler2D sceneDepth;
 		uniform sampler2D sceneMaterial;
 		uniform sampler2D normalTexture;
@@ -110,40 +113,46 @@ vec3 getWorldPos(float depth, vec2 coord) {
 			return normalize(cross(hVec, vVec));
 		  }
 		void main() {
-			vec4 sum = vec4( 0.0 );
 			float[9] weights =  float[9](0.051, 0.0918, 0.12245, 0.1531, 0.1633, 0.1531, 0.12245, 0.0918, 0.051);
-			float weightSum = 0.0;
 			float d = texture2D(sceneDepth, vUv).x;
 			if (d == 1.0) {
 				gl_FragColor = texture2D(tDiffuse, vUv);
 				return;
 			}
-			vec3 myColor = texture2D(tDiffuse, vUv).rgb;
-			float b = texture2D(tDiffuse, vUv).x;
 			float uvDepth = linearize_depth(d, 0.1, 1000.0);
 			vec3 uvWorldPos = getWorldPos(d, vUv);
 			vec3 normal =  normalize((viewMatrixInv * normalize(vec4(texture2D(normalTexture, vUv).rgb, 0.0))).xyz);
-			float roughness = texture2D(sceneMaterial, vUv).g;
-			float radius = h / resolution.x * roughness; //max(h * (1.0 - d) * (-blurSharp * pow(b - 0.5, 2.0) + 1.0), blurThreshold / resolution.x);
+			vec4 matData = texture2D(sceneMaterial, vUv);
+			float metalness = matData.r;
+			float roughness = matData.g;
+			float radius = h / resolution.x; //max(h * (1.0 - d) * (-blurSharp * pow(b - 0.5, 2.0) + 1.0), blurThreshold / resolution.x);
 			vec3 planeNormal = normal;
 			float planeConstant = -dot(uvWorldPos, normal);
+			vec3 diffuseSum = vec3( 0.0 );
+			float weightSum = 0.0;
 			for(float i = -4.0; i <= 4.0; i++) {
 				vec2 sampleUv = vec2( vUv.x + i * radius, vUv.y );
 				vec2 clipRangeCheck = step(vec2(0.0),sampleUv.xy) * step(sampleUv.xy, vec2(1.0));
-				float w = weights[int(i + 4.0)] * depthFalloff(sampleUv, planeNormal, planeConstant) * clipRangeCheck.x * clipRangeCheck.y;// * colorFalloff(sampleUv, myColor);
-				sum += texture2D( tDiffuse, sampleUv) * w ;
+				float w = weights[int(i + 4.0)] * depthFalloff(sampleUv, planeNormal, planeConstant) * clipRangeCheck.x * clipRangeCheck.y;
+				diffuseSum += texture2D( tDiffuse, sampleUv).rgb * w ;
 				weightSum += w;
 			}
-			sum /= weightSum;
-		/*	sum += texture2D( tDiffuse, vec2( vUv.x - 3.0 * radius, vUv.y ) ) * 0.0918;
-			sum += texture2D( tDiffuse, vec2( vUv.x - 2.0 * radius, vUv.y ) ) * 0.12245;
-			sum += texture2D( tDiffuse, vec2( vUv.x - 1.0 * radius, vUv.y ) ) * 0.1531;
-			sum += texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ) * 0.1633;
-			sum += texture2D( tDiffuse, vec2( vUv.x + 1.0 * radius, vUv.y ) ) * 0.1531;
-			sum += texture2D( tDiffuse, vec2( vUv.x + 2.0 * radius, vUv.y ) ) * 0.12245;
-			sum += texture2D( tDiffuse, vec2( vUv.x + 3.0 * radius, vUv.y ) ) * 0.0918;
-			sum += texture2D( tDiffuse, vec2( vUv.x + 4.0 * radius, vUv.y ) ) * 0.051;*/
-			gl_FragColor = sum;
+			diffuseSum /= weightSum;
+			radius *= clamp(sqrt(roughness), 0.1 * (1.0-metalness), 1.0);
+			vec3 specularSum = vec3( 0.0 );
+			weightSum = 0.0;
+			for(float i = -4.0; i <= 4.0; i++) {
+				vec2 sampleUv = vec2( vUv.x + i * radius, vUv.y );
+				vec2 clipRangeCheck = step(vec2(0.0),sampleUv.xy) * step(sampleUv.xy, vec2(1.0));
+				float w = weights[int(i + 4.0)] * depthFalloff(sampleUv, planeNormal, planeConstant) * clipRangeCheck.x * clipRangeCheck.y;
+				specularSum += texture2D( tSpecular, sampleUv).rgb * w ;
+				weightSum += w;
+			}
+			specularSum /= weightSum;
+
+
+			gl_FragColor = vec4(diffuseSum, 1.0);
+			specular = vec4(specularSum, 1.0);
 		}`
 
 };

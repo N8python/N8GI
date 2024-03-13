@@ -8,6 +8,7 @@ const EffectCompositer = {
         sceneAO: { value: null },
         voxelTexture: { value: null },
         tDiffuse: { value: null },
+        tSpecular: { value: null },
         giStrengthMultiplier: { value: 1.0 },
         giOnly: { value: false },
         aoEnabled: { value: true },
@@ -29,6 +30,7 @@ const EffectCompositer = {
     uniform sampler2D sceneAlbedo;
     uniform sampler2D sceneAO;
     uniform sampler2D tDiffuse;
+    uniform sampler2D tSpecular;
     uniform sampler2D voxelTexture;
     uniform samplerCube background;
     uniform mat4 viewMatrixInv;
@@ -60,8 +62,9 @@ const EffectCompositer = {
         }
         vec4 albedo = texture2D(sceneAlbedo, vUv);
         vec4 denoised = texture2D(tDiffuse, vUv);
+        vec4 specular = texture2D(tSpecular, vUv);
         float giStrength = giStrengthMultiplier;
-        gl_FragColor = vec4((diffuse.rgb + denoised.rgb * albedo.rgb * giStrength) * ao.rgb, 1.0);
+        gl_FragColor = vec4((diffuse.rgb + denoised.rgb * albedo.rgb * giStrength + specular.rgb * albedo.rgb) * ao.rgb, 1.0);
         if (giOnly) {
             gl_FragColor = vec4(giStrength * denoised.rgb * ao.rgb, 1.0);
         }
