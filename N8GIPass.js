@@ -213,7 +213,11 @@ class N8GIPass extends Pass {
 
         this.voxelModule.children.forEach(child => {
             const newGBufferMaterial = child.material.clone();
+            /* if (newGBufferMaterial.onBeforeCompile) {
+                 let oldHook = newGBufferMaterial.onBeforeCompile;*/
+            let oldHook = newGBufferMaterial.onBeforeCompile || function() {};
             newGBufferMaterial.onBeforeCompile = (shader) => {
+                oldHook(shader);
                 shader.fragmentShader = "layout(location = 1) out vec4 gNormal;\nlayout(location = 2) out vec4 gAlbedo;\nlayout(location = 3) out vec4 gMaterial;\n" + shader.fragmentShader;
                 shader.fragmentShader = shader.fragmentShader.replace(
                     "#include <dithering_fragment>",
