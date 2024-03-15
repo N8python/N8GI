@@ -17,7 +17,8 @@ const EffectShader = {
         'resolution': { value: new THREE.Vector2() },
         'time': { value: 0.0 },
         'voxelTexture': { value: null },
-        'voxelColor': { value: null },
+        'voxelColor1': { value: null },
+        'voxelColor2': { value: null },
         'voxelColorTextureSize': { value: 0 },
         'boxSize': { value: new THREE.Vector3(1, 1, 1) },
         'boxCenter': { value: new THREE.Vector3(0, 0, 0) },
@@ -46,7 +47,8 @@ const EffectShader = {
     uniform highp sampler2D bluenoise;
     uniform highp isampler3D voxelTexture;
     uniform highp samplerCube skybox;
-    uniform highp usampler2D voxelColor;
+    uniform highp usampler2D voxelColor1;
+    uniform highp usampler2D voxelColor2;
     uniform int voxelColorTextureSize;
     uniform mat4 projMat;
     uniform mat4 viewMat;
@@ -155,13 +157,63 @@ const EffectShader = {
     pos += boxCenter;
     return pos;
   }
-  uvec3 getVoxelColor(ivec3 voxelPos) {
+  uint quantizeToBits(float num, float m, float bitsPowTwo) {
+    num = clamp(num, 0.0, m);
+    return uint(bitsPowTwo * sqrt(num / m));
+  }
+  float unquantizeToBits(uint num, float m, float bitsPowTwo) {
+    float t = float(num) / bitsPowTwo;
+    return (t * t * m);
+  }
+  uint packThreeBytes(vec3 light) {
+    float maxNum = 10.0;
+    float bitsPowTwo = 1023.0;
+    uint r = quantizeToBits(light.r, maxNum, bitsPowTwo);
+    uint g = quantizeToBits(light.g, maxNum, bitsPowTwo);
+    uint b = quantizeToBits(light.b, maxNum, bitsPowTwo);
+  
+    return r << 20 | g << 10 | b;
+  }
+  vec3 unpackRGB(uint packedInt) {
+    float maxNum = 10.0;
+    float bitsPowTwo = 1023.0;
+    float r = unquantizeToBits(packedInt >> 20u, maxNum, bitsPowTwo);
+    float g = unquantizeToBits((packedInt >> 10u) & 1023u, maxNum, bitsPowTwo);
+    float b = unquantizeToBits(packedInt & 1023u, maxNum, bitsPowTwo);
+    return vec3(r, g, b);
+    
+  }
+  vec3 getVoxelColor(ivec3 voxelPos, vec3 accessDir) {
     ivec3 VOXEL_AMOUNT = ivec3(voxelAmount);
     int index = voxelPos.x + voxelPos.y * VOXEL_AMOUNT.x + voxelPos.z * VOXEL_AMOUNT.x * VOXEL_AMOUNT.y;
     int sampleY = index / voxelColorTextureSize;
     int sampleX = index - sampleY * voxelColorTextureSize;
-    uvec4 color = texelFetch(voxelColor, ivec2(sampleX, sampleY), 0);
-    return color.rgb;
+    uvec4 color = texelFetch(voxelColor1, ivec2(sampleX, sampleY), 0);
+    uvec4 color2 = texelFetch(voxelColor2, ivec2(sampleX, sampleY), 0);
+    vec3[6] cardinals = vec3[6](
+      vec3(1.0, 0.0, 0.0),
+      vec3(-1.0, 0.0, 0.0),
+      vec3(0.0, 1.0, 0.0),
+      vec3(0.0, -1.0, 0.0),
+      vec3(0.0, 0.0, 1.0),
+      vec3(0.0, 0.0, -1.0)
+  );
+    vec3[6] accumulatedLight;
+    accumulatedLight[0] = unpackRGB(color.r).rgb;
+    accumulatedLight[1] = unpackRGB(color.g).rgb;
+    accumulatedLight[2] = unpackRGB(color.b).rgb;
+    accumulatedLight[3] = unpackRGB(color2.r).rgb;
+    accumulatedLight[4] = unpackRGB(color2.g).rgb;
+    accumulatedLight[5] = unpackRGB(color2.b).rgb;
+
+    vec3 accumulatedColor = vec3(0.0);
+    float w = 0.0;
+    vec3 dotAccessDir = -accessDir;
+    for (int i = 0; i < 6; i++) {
+       float dotProduct = max(dot(cardinals[i], dotAccessDir), 0.0);
+        accumulatedColor += accumulatedLight[i] * dotProduct;
+    }
+    return accumulatedColor;
   }
   vec3 voxelIntersectPos(vec3 voxel, Ray ray) {
     vec3 hitPos = toWorldSpace(voxel);
@@ -225,32 +277,7 @@ vec3 computeNormal(vec3 worldPos, vec2 vUv) {
 
   return normalize(cross(dpdx, dpdy));
 }
-uint quantizeToBits(float num, float m, float bitsPowTwo) {
-  num = clamp(num, 0.0, m);
-  return uint(bitsPowTwo * sqrt(num / m));
-}
-float unquantizeToBits(uint num, float m, float bitsPowTwo) {
-  float t = float(num) / bitsPowTwo;
-  return (t * t * m);
-}
-uint packThreeBytes(vec3 light) {
-  float maxNum = 10.0;
-  float bitsPowTwo = 1023.0;
-  uint r = quantizeToBits(light.r, maxNum, bitsPowTwo);
-  uint g = quantizeToBits(light.g, maxNum, bitsPowTwo);
-  uint b = quantizeToBits(light.b, maxNum, bitsPowTwo);
 
-  return r << 20 | g << 10 | b;
-}
-vec3 unpackRGB(uint packedInt) {
-  float maxNum = 10.0;
-  float bitsPowTwo = 1023.0;
-  float r = unquantizeToBits(packedInt >> 20u, maxNum, bitsPowTwo);
-  float g = unquantizeToBits((packedInt >> 10u) & 1023u, maxNum, bitsPowTwo);
-  float b = unquantizeToBits(packedInt & 1023u, maxNum, bitsPowTwo);
-  return vec3(r, g, b);
-  
-}
 
 vec4 getSampleDir(vec3 diskInfo, vec3 normal, vec3 viewDir, vec3 worldPos, float roughness, float metalness) {
   float f0 = 0.04 + 0.96 * metalness;
@@ -319,12 +346,7 @@ vec4 takeSample(
     RayHit hit = raycast(ray);
     vec3 reflectedColor = vec3(0.0);
     if (hit.hit) {
-      uvec3 voxData = getVoxelColor(hit.voxelPos);
-      vec3 voxNormal = 2.0 * unpackRGB(voxData.b) - 1.0;
-      vec3 color = unpackRGB(voxData.r).rgb;
-      vec3 backColor = unpackRGB(voxData.g).rgb;
-      reflectedColor = dot(voxNormal, -ray.direction) > 0.0 ? color : backColor;
-
+      reflectedColor = getVoxelColor(hit.voxelPos, -hit.normal);
     } else {
       reflectedColor = textureLod(skybox, ray.direction, 9.0 * roughness).rgb / 3.14159;
     }

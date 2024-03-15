@@ -272,10 +272,8 @@ async function main() {
         n8giPass.n8aopass.configuration.intensity = effectController.aoIntensity;
 
 
-        directionalLight.position.set(
-            60 * Math.cos(performance.now() / 1000),
-            200,
-            60 * Math.sin(performance.now() / 1000)
+        directionalLight.position.set(-60 * Math.cos(performance.now() / 1000),
+            200, -60 * Math.sin(performance.now() / 1000)
         );
         composer.render();
 

@@ -316,7 +316,8 @@ class N8GIPass extends Pass {
         this.effectQuad.material.uniforms["bluenoise"].value = this.bluenoise;
         this.effectQuad.material.uniforms["skybox"].value = this.scene.background;
         this.effectQuad.material.uniforms["voxelTexture"].value = this.voxelModule.getIndexTexture();
-        this.effectQuad.material.uniforms["voxelColor"].value = this.voxelModule.getVoxelRenderTarget().texture;
+        this.effectQuad.material.uniforms["voxelColor1"].value = this.voxelModule.getVoxelRenderTarget().textures[0];
+        this.effectQuad.material.uniforms["voxelColor2"].value = this.voxelModule.getVoxelRenderTarget().textures[1];
         this.effectQuad.material.uniforms["voxelColorTextureSize"].value = this.voxelModule.getVoxelRenderTargetSize();
         this.effectQuad.material.uniforms["projMat"].value = this.camera.projectionMatrix;
         this.effectQuad.material.uniforms["viewMat"].value = this.camera.matrixWorldInverse;

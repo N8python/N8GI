@@ -333,7 +333,9 @@ const VoxelColorShader = {
         uniform ivec3 VOXEL_AMOUNT;
         uniform vec3 boxCenter;
         uniform vec3 boxSize;
-        layout(location = 0) out uvec4 pcColor;
+        layout(location = 0) out uvec4 pcColor1;
+        layout(location = 1) out uvec4 pcColor2;
+        
         in vec2 vUv;
         float dot2( in vec3 v ) { return dot(v,v); }
 float maxcomp( in vec2 v ) { return max(v.x,v.y); }
@@ -439,7 +441,8 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
             int voxelX = index - voxelZ * VOXEL_AMOUNT.x * VOXEL_AMOUNT.y - voxelY * VOXEL_AMOUNT.x;
             int sampledIndex = texelFetch(voxelTex, ivec3(voxelX, voxelY, voxelZ), 0).r;
            if (sampledIndex < 0) {
-                pcColor = uvec4(0, 0, 0, 0);
+                pcColor1 = uvec4(0, 0, 0, 0);
+                pcColor2 = uvec4(0, 0, 0, 0);
             } else {
                 int meshIndex = sample1Dimi(meshIndexTex, sampledIndex * 3, posSize).r;
                 mat4 worldMatrix;
@@ -507,36 +510,62 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                     materialData.r
                 );//materials[materialIndex].emissive;
                 vec4 sampledTexel = textureLod(mapAtlas, vec3(uv, mapIndex), mipLevel);
-                vec3 accumulatedLight = vec3(0.0);
-                vec3 accumulatedLightBack = vec3(0.0);
+                /*vec3 accumulatedLight = vec3(0.0);
+                vec3 accumulatedLightBack = vec3(0.0);*/
+                vec3[6] cardinals = vec3[6](
+                    vec3(1.0, 0.0, 0.0),
+                    vec3(-1.0, 0.0, 0.0),
+                    vec3(0.0, 1.0, 0.0),
+                    vec3(0.0, -1.0, 0.0),
+                    vec3(0.0, 0.0, 1.0),
+                    vec3(0.0, 0.0, -1.0)
+                );
+                vec3[6] accumulatedLight = vec3[6](
+                    vec3(0.0),
+                    vec3(0.0),
+                    vec3(0.0),
+                    vec3(0.0),
+                    vec3(0.0),
+                    vec3(0.0)
+                );
                 #pragma unroll_loop_start
                 for(int i = 0; i < 1; i++) {
 
                     vec3 lightDirection = directionalLights[ i ].direction;
                     
-                    float incidentLight = max(dot( interpolatedNormal, lightDirection ), 0.0);
-                    float incidentLightBack = max(dot( -interpolatedNormal, lightDirection ), 0.0);
-
+                   //float incidentLight = max(dot( interpolatedNormal, lightDirection ), 0.0);
+                   // float incidentLightBack = max(dot( -interpolatedNormal, lightDirection ), 0.0);
+                    float s = 1.0;
                     #if defined( USE_SHADOWMAP ) && ( UNROLLED_LOOP_INDEX < N_DIR_LIGHT_SHADOWS )
                         vec4 shadowCoord = directionalShadowMatrix[i] * vec4(worldPos, 1.0);
                         float shadow = getShadow(directionalShadowMap[i], directionalLightShadows[i].shadowMapSize, directionalLightShadows[i].shadowBias, directionalLightShadows[i].shadowRadius, shadowCoord);
-                        incidentLight *= shadow;
+                        s *= shadow;
                     #endif
+                    if (s > 0.0) {
+                        for (int j = 0; j < 6; j++) {
+                            accumulatedLight[j] += (directionalLights[ i ].color / 3.14159) * s * sampledTexel.rgb * color * (1.0 - metalness) * max(dot(cardinals[j], lightDirection), 0.0);
+                        }
+                    }
 
-                    accumulatedLight += (directionalLights[ i ].color / 3.14159) * incidentLight * sampledTexel.rgb * color * (1.0 - metalness);
-                    accumulatedLightBack += (directionalLights[ i ].color / 3.14159) * incidentLightBack * sampledTexel.rgb * color * (1.0 - metalness);
+                    /*accumulatedLight += (directionalLights[ i ].color / 3.14159) * incidentLight * sampledTexel.rgb * color * (1.0 - metalness);
+                    accumulatedLightBack += (directionalLights[ i ].color / 3.14159) * incidentLightBack * sampledTexel.rgb * color * (1.0 - metalness);*/
+
+
                 }
                 #pragma unroll_loop_end
 
-                accumulatedLight += emissive;
-                accumulatedLightBack += emissive;
+              /*  accumulatedLight += emissive;
+                accumulatedLightBack += emissive;*/
+                for(int j = 0; j < 6; j++) {
+                    accumulatedLight[j] += emissive;
+                }
 
 
                 
 
 
                 vec3 center =                     (posA + posB + posC) / 3.0;
-                pcColor =
+              /*  pcColor1 =
                 uvec4(
                    packThreeBytes(vec3(
                     accumulatedLight
@@ -548,6 +577,19 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                     packThreeBytes(interpolatedNormal * 0.5 + 0.5)
                     , 
                     1);
+                pcColor2 = uvec4(0, 0, 0, 0);*/
+                pcColor1 = uvec4(
+                    packThreeBytes(accumulatedLight[0]),
+                    packThreeBytes(accumulatedLight[1]),
+                    packThreeBytes(accumulatedLight[2]),
+                    1
+                );
+                pcColor2 = uvec4(
+                    packThreeBytes(accumulatedLight[3]),
+                    packThreeBytes(accumulatedLight[4]),
+                    packThreeBytes(accumulatedLight[5]),
+                    1
+                );
                  //vec4(unpackRGBAToDepth(vec4(accumulatedLight, 1.0)), unpackRGBAToDepth(vec4(accumulatedLightBack, 1.0)), unpackRGBAToDepth(vec4(0.5 + 0.5 * interpolatedNormal, 1.0)), 1.0);
 
 

@@ -34,7 +34,8 @@ export class VoxelModule {
             magFilter: THREE.NearestFilter,
             format: THREE.RGBAIntegerFormat,
             type: THREE.UnsignedIntType,
-            internalFormat: "RGBA32UI"
+            internalFormat: "RGBA32UI",
+            count: 2
         });
 
         this.indexTex = new THREE.Data3DTexture(this.indexArray, this.VOXEL_AMOUNT.x, this.VOXEL_AMOUNT.y, this.VOXEL_AMOUNT.z);
