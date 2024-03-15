@@ -407,6 +407,19 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
 
         return r << 20 | g << 10 | b;
     }
+    float unquantizeToBits(uint num, float m, float bitsPowTwo) {
+        float t = float(num) / bitsPowTwo;
+        return (t * t * m);
+      }
+      vec3 unpackRGB(uint packedInt) {
+        float maxNum = 10.0;
+        float bitsPowTwo = 1023.0;
+        float r = unquantizeToBits(packedInt >> 20u, maxNum, bitsPowTwo);
+        float g = unquantizeToBits((packedInt >> 10u) & 1023u, maxNum, bitsPowTwo);
+        float b = unquantizeToBits(packedInt & 1023u, maxNum, bitsPowTwo);
+        return vec3(r, g, b);
+        
+      }
     float hash(float n) {
         return fract(sin(n) * 43758.5453123);
     }
@@ -417,13 +430,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         float b = hash(seed + 2.0);
         return vec3(r, g, b);
     }
-    vec3 unpackRGB(uint rgb) {
-        return vec3(
-            float((rgb >> 16) & 0xFFu) / 255.0,
-            float((rgb >> 8) & 0xFFu) / 255.0,
-            float(rgb & 0xFFu) / 255.0
-        );
-    }
+    
 
         void main() {
             int index = int(gl_FragCoord.y) * textureSize + int(gl_FragCoord.x);

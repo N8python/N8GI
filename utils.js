@@ -1,11 +1,40 @@
 import * as THREE from 'https://unpkg.com/three@0.162.0/build/three.module.min.js';
 
-const packRGBToUint32 = (v) => {
+/*const packRGBToUint32 = (v) => {
     const r = Math.floor(v.x * 255.0);
     const g = Math.floor(v.y * 255.0);
     const b = Math.floor(v.z * 255.0);
     return (r << 16) | (g << 8) | b;
-};
+};*/
+
+/*
+  uint quantizeToBits(float num, float m, float bitsPowTwo) {
+        num = clamp(num, 0.0, m);
+        return uint(bitsPowTwo * sqrt(num / m));
+      }
+      uint packThreeBytes(vec3 light) {
+        float maxNum = 10.0;
+        float bitsPowTwo = 1023.0;
+        uint r = quantizeToBits(light.r, maxNum, bitsPowTwo);
+        uint g = quantizeToBits(light.g, maxNum, bitsPowTwo);
+        uint b = quantizeToBits(light.b, maxNum, bitsPowTwo);
+
+        return r << 20 | g << 10 | b;
+    }
+    */
+
+const quantizeToBits = (num, m, bitsPowTwo) => {
+    num = Math.min(Math.max(num, 0.0), m);
+    return Math.floor(bitsPowTwo * Math.sqrt(num / m));
+}
+const packRGBToUint32 = (v) => {
+    const maxNum = 10.0;
+    const bitsPowTwo = 1023.0;
+    const r = quantizeToBits(v.x, maxNum, bitsPowTwo);
+    const g = quantizeToBits(v.y, maxNum, bitsPowTwo);
+    const b = quantizeToBits(v.z, maxNum, bitsPowTwo);
+    return (r << 20) | (g << 10) | b;
+}
 const createBufferTexture = (size) => {
     const buffer = new Float32Array(size * size * 4);
     const tex = new THREE.DataTexture(buffer, size, size, THREE.RGBAFormat, THREE.FloatType);
