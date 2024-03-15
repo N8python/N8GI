@@ -46,7 +46,7 @@ const EffectShader = {
     uniform highp sampler2D bluenoise;
     uniform highp isampler3D voxelTexture;
     uniform highp samplerCube skybox;
-    uniform highp sampler2D voxelColor;
+    uniform highp usampler2D voxelColor;
     uniform int voxelColorTextureSize;
     uniform mat4 projMat;
     uniform mat4 viewMat;
@@ -155,12 +155,12 @@ const EffectShader = {
     pos += boxCenter;
     return pos;
   }
-  vec3 getVoxelColor(ivec3 voxelPos) {
+  uvec3 getVoxelColor(ivec3 voxelPos) {
     ivec3 VOXEL_AMOUNT = ivec3(voxelAmount);
     int index = voxelPos.x + voxelPos.y * VOXEL_AMOUNT.x + voxelPos.z * VOXEL_AMOUNT.x * VOXEL_AMOUNT.y;
     int sampleY = index / voxelColorTextureSize;
     int sampleX = index - sampleY * voxelColorTextureSize;
-    vec4 color = texelFetch(voxelColor, ivec2(sampleX, sampleY), 0);
+    uvec4 color = texelFetch(voxelColor, ivec2(sampleX, sampleY), 0);
     return color.rgb;
   }
   vec3 voxelIntersectPos(vec3 voxel, Ray ray) {
@@ -225,20 +225,31 @@ vec3 computeNormal(vec3 worldPos, vec2 vUv) {
 
   return normalize(cross(dpdx, dpdy));
 }
+uint quantizeToBits(float num, float m, float bitsPowTwo) {
+  num = clamp(num, 0.0, m);
+  return uint(bitsPowTwo * sqrt(num / m));
+}
+float unquantizeToBits(uint num, float m, float bitsPowTwo) {
+  float t = float(num) / bitsPowTwo;
+  return (t * t * m);
+}
+uint packThreeBytes(vec3 light) {
+  float maxNum = 10.0;
+  float bitsPowTwo = 1023.0;
+  uint r = quantizeToBits(light.r, maxNum, bitsPowTwo);
+  uint g = quantizeToBits(light.g, maxNum, bitsPowTwo);
+  uint b = quantizeToBits(light.b, maxNum, bitsPowTwo);
 
-vec3 unpackThreeBytes(float packedFloat) {
-  // Convert the float back to an integer
-  int packedInt = int(packedFloat * 16777215.0); // 16777215.0 = 2^24 - 1
+  return r << 20 | g << 10 | b;
+}
+vec3 unpackRGB(uint packedInt) {
+  float maxNum = 10.0;
+  float bitsPowTwo = 1023.0;
+  float r = unquantizeToBits(packedInt >> 20u, maxNum, bitsPowTwo);
+  float g = unquantizeToBits((packedInt >> 10u) & 1023u, maxNum, bitsPowTwo);
+  float b = unquantizeToBits(packedInt & 1023u, maxNum, bitsPowTwo);
+  return vec3(r, g, b);
   
-  // Extract the three bytes
-  int byteR = (packedInt >> 16) & 0xFF;
-  int byteG = (packedInt >> 8) & 0xFF;
-  int byteB = packedInt & 0xFF;
-  
-  // Convert the bytes to a vec3
-  vec3 bytes = vec3(float(byteR), float(byteG), float(byteB));
-  
-  return bytes / 255.0;
 }
 
 vec4 getSampleDir(vec3 diskInfo, vec3 normal, vec3 viewDir, vec3 worldPos, float roughness, float metalness) {
@@ -308,10 +319,10 @@ vec4 takeSample(
     RayHit hit = raycast(ray);
     vec3 reflectedColor = vec3(0.0);
     if (hit.hit) {
-      vec3 voxData = getVoxelColor(hit.voxelPos);
-      vec3 voxNormal = 2.0 * unpackThreeBytes(voxData.b) - 1.0;
-      vec3 color = unpackThreeBytes(voxData.r).rgb;
-      vec3 backColor = unpackThreeBytes(voxData.g).rgb;
+      uvec3 voxData = getVoxelColor(hit.voxelPos);
+      vec3 voxNormal = 2.0 * unpackRGB(voxData.b) - 1.0;
+      vec3 color = unpackRGB(voxData.r).rgb;
+      vec3 backColor = unpackRGB(voxData.g).rgb;
       reflectedColor = dot(voxNormal, -ray.direction) > 0.0 ? color : backColor;
 
     } else {

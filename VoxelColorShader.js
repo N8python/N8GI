@@ -7,13 +7,16 @@ const VoxelColorShader = {
         }
     `,
     vertexShader: /*glsl*/ `
-        varying vec2 vUv;
+        in vec2 uv;
+        in vec3 position;
+        out vec2 vUv;
         void main() {
             vUv = uv;
             gl_Position = vec4(position, 1.0);
         }
         `,
     fragmentShader: /*glsl*/ `
+    precision highp float;
         #include <common>
         #define N_DIR_LIGHTS 1
        // #include <lights_pars_begin>
@@ -61,13 +64,13 @@ const VoxelColorShader = {
 
 	float texture2DCompare( sampler2D depths, vec2 uv, float compare ) {
 
-		return step( compare, unpackRGBAToDepth( texture2D( depths, uv ) ) );
+		return step( compare, unpackRGBAToDepth( texture( depths, uv ) ) );
 
 	}
 
 	vec2 texture2DDistribution( sampler2D shadow, vec2 uv ) {
 
-		return unpackRGBATo2Half( texture2D( shadow, uv ) );
+		return unpackRGBATo2Half( texture( shadow, uv ) );
 
 	}
 
@@ -330,7 +333,8 @@ const VoxelColorShader = {
         uniform ivec3 VOXEL_AMOUNT;
         uniform vec3 boxCenter;
         uniform vec3 boxSize;
-        varying vec2 vUv;
+        layout(location = 0) out uvec4 pcColor;
+        in vec2 vUv;
         float dot2( in vec3 v ) { return dot(v,v); }
 float maxcomp( in vec2 v ) { return max(v.x,v.y); }
 precision highp isampler2D;
@@ -390,17 +394,18 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
         pos *= vec3(VOXEL_AMOUNT) / boxSize;
         return pos;
       }
-      float packThreeBytes(vec3 bytes) {
-        // Ensure the input is clamped to the valid range [0, 255]
-        bytes = clamp(bytes, 0.0, 1.0) * 254.0;
-        
-        // Combine the three bytes into one integer
-        int packedInt = (int(bytes.x) << 16) | (int(bytes.y) << 8) | int(bytes.z);
-        
-        // Convert the integer to a float
-        float packedFloat = float(packedInt) / 16777215.0; // 16777215.0 = 2^24 - 1
-        
-        return packedFloat;
+      uint quantizeToBits(float num, float m, float bitsPowTwo) {
+        num = clamp(num, 0.0, m);
+        return uint(bitsPowTwo * sqrt(num / m));
+      }
+      uint packThreeBytes(vec3 light) {
+        float maxNum = 10.0;
+        float bitsPowTwo = 1023.0;
+        uint r = quantizeToBits(light.r, maxNum, bitsPowTwo);
+        uint g = quantizeToBits(light.g, maxNum, bitsPowTwo);
+        uint b = quantizeToBits(light.b, maxNum, bitsPowTwo);
+
+        return r << 20 | g << 10 | b;
     }
     float hash(float n) {
         return fract(sin(n) * 43758.5453123);
@@ -427,7 +432,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
             int voxelX = index - voxelZ * VOXEL_AMOUNT.x * VOXEL_AMOUNT.y - voxelY * VOXEL_AMOUNT.x;
             int sampledIndex = texelFetch(voxelTex, ivec3(voxelX, voxelY, voxelZ), 0).r;
            if (sampledIndex < 0) {
-                gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+                pcColor = uvec4(0, 0, 0, 0);
             } else {
                 int meshIndex = sample1Dimi(meshIndexTex, sampledIndex * 3, posSize).r;
                 mat4 worldMatrix;
@@ -524,8 +529,8 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
 
 
                 vec3 center =                     (posA + posB + posC) / 3.0;
-                gl_FragColor =
-                vec4(
+                pcColor =
+                uvec4(
                    packThreeBytes(vec3(
                     accumulatedLight
                     //randomColor(100.0*float(meshIndex)) 
@@ -535,7 +540,7 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                    )),
                     packThreeBytes(interpolatedNormal * 0.5 + 0.5)
                     , 
-                    1.0);
+                    1);
                  //vec4(unpackRGBAToDepth(vec4(accumulatedLight, 1.0)), unpackRGBAToDepth(vec4(accumulatedLightBack, 1.0)), unpackRGBAToDepth(vec4(0.5 + 0.5 * interpolatedNormal, 1.0)), 1.0);
 
 

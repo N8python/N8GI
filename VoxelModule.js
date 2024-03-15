@@ -32,8 +32,9 @@ export class VoxelModule {
         this.voxelRenderTarget = new THREE.WebGLRenderTarget(this.voxelRenderTargetSize, this.voxelRenderTargetSize, {
             minFilter: THREE.NearestFilter,
             magFilter: THREE.NearestFilter,
-            format: THREE.RGBAFormat,
-            type: THREE.FloatType
+            format: THREE.RGBAIntegerFormat,
+            type: THREE.UnsignedIntType,
+            internalFormat: "RGBA32UI"
         });
 
         this.indexTex = new THREE.Data3DTexture(this.indexArray, this.VOXEL_AMOUNT.x, this.VOXEL_AMOUNT.y, this.VOXEL_AMOUNT.z);
@@ -234,7 +235,7 @@ export class VoxelModule {
         this.sahSplits = [];
 
 
-        this.voxelColorShader = new FullScreenQuad(new THREE.ShaderMaterial({
+        this.voxelColorShader = new FullScreenQuad(new THREE.RawShaderMaterial({
             lights: false,
             uniforms: {
                 ...THREE.UniformsLib.lights,
@@ -263,7 +264,11 @@ export class VoxelModule {
             },
             vertexShader: VoxelColorShader.vertexShader,
             fragmentShader: VoxelColorShader.fragmentShader,
+            glslVersion: THREE.GLSL3
         }));
+        /* this.voxelColorShader.material.onBeforeCompile = (shader) => {
+             console.log(shader.fragmentShader);
+         }*/
 
     }
 

@@ -143,6 +143,9 @@ async function main() {
             child.material.dithering = true;
             child.material.envMap = environment;
             child.material.envMapIntensity = 0.0;
+            /*  child.material.metalness = 0.5;
+              child.material.metalnessMap = null;
+              child.material.roughness = 0.0;*/
         }
     });
 
