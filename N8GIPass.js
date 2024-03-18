@@ -248,6 +248,15 @@ class N8GIPass extends Pass {
                 }
             });
         });
+
+        const lights = [];
+        scene.traverse(obj => {
+            if (obj.isLight) {
+                lights.push(obj);
+            }
+        });
+
+
     }
     setSize(width, height) {
         this.width = width;

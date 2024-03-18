@@ -235,7 +235,18 @@ export class VoxelModule {
         this.firstVoxelization = true;
         this.sahSplits = [];
 
-
+        let vs = VoxelColorShader.vertexShader;
+        let fs = VoxelColorShader.fragmentShader;
+        const lights = [];
+        this.scene.traverse((child) => {
+            if (child.isLight) {
+                lights.push(child);
+            }
+        });
+        fs = fs.replace(`#include <lights_pars_begin>`, THREE.ShaderChunk.lights_pars_begin);
+        fs = fs.replace(`#include <shadowmap_pars_fragment>`, THREE.ShaderChunk.shadowmap_pars_fragment);
+        fs = fs.replace(/NUM_DIR_LIGHTS/g, lights.filter((light) => light.isDirectionalLight).length);
+        fs = fs.replace(/NUM_DIR_LIGHT_SHADOWS/g, lights.filter((light) => light.isDirectionalLight && light.castShadow).length);
         this.voxelColorShader = new FullScreenQuad(new THREE.RawShaderMaterial({
             lights: false,
             uniforms: {
@@ -263,10 +274,13 @@ export class VoxelModule {
                 viewMatrixInv: { value: new THREE.Matrix4() },
                 projectionMatrixInv: { value: new THREE.Matrix4() },
             },
-            vertexShader: VoxelColorShader.vertexShader,
-            fragmentShader: VoxelColorShader.fragmentShader,
+            vertexShader: vs,
+            fragmentShader: fs,
             glslVersion: THREE.GLSL3
         }));
+
+        //this.voxelColorShader._mesh.add(
+
         /* this.voxelColorShader.material.onBeforeCompile = (shader) => {
              console.log(shader.fragmentShader);
          }*/
