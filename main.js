@@ -20,14 +20,21 @@ async function main() {
     const renderer = new THREE.WebGLRenderer();
     THREE.Texture.DEFAULT_ANISOTROPY = renderer.capabilities.getMaxAnisotropy();
     renderer.setSize(clientWidth, clientHeight);
+
     document.body.appendChild(renderer.domElement);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.autoUpdate = false;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 25, 0);
-    const stats = new Stats();
-    stats.showPanel(0);
+    const stats = new Stats({
+        logsPerSecond: 20,
+        samplesLog: 100,
+        samplesGraph: 10,
+        mode: 2,
+
+    });
+    stats.init(renderer);
     document.body.appendChild(stats.dom);
 
     const environment = new THREE.CubeTextureLoader().load([
@@ -278,7 +285,6 @@ async function main() {
 
         controls.update();
         stats.update();
-
         requestAnimationFrame(animate);
     }
 

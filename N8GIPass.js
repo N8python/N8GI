@@ -393,7 +393,6 @@ class N8GIPass extends Pass {
                 this.verticalQuad.material.uniforms["tSpecular"].value = this.readTargetInternal.textures[1];
                 renderer.setRenderTarget(this.writeTargetInternal);
                 this.verticalQuad.render(renderer);
-
             }
         }
         this.effectCompositer.material.uniforms["cameraPos"].value = this.camera.getWorldPosition(new THREE.Vector3());
