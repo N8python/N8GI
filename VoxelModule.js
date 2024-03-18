@@ -247,6 +247,10 @@ export class VoxelModule {
         fs = fs.replace(`#include <shadowmap_pars_fragment>`, THREE.ShaderChunk.shadowmap_pars_fragment);
         fs = fs.replace(/NUM_DIR_LIGHTS/g, lights.filter((light) => light.isDirectionalLight).length);
         fs = fs.replace(/NUM_DIR_LIGHT_SHADOWS/g, lights.filter((light) => light.isDirectionalLight && light.castShadow).length);
+        fs = fs.replace(/NUM_POINT_LIGHTS/g, lights.filter((light) => light.isPointLight).length);
+        fs = fs.replace(/NUM_POINT_LIGHT_SHADOWS/g, lights.filter((light) => light.isPointLight && light.castShadow).length);
+        fs = fs.replace(/NUM_SPOT_LIGHTS/g, lights.filter((light) => light.isSpotLight).length);
+        fs = fs.replace(/NUM_SPOT_LIGHT_SHADOWS/g, lights.filter((light) => light.isSpotLight && light.castShadow).length);
         this.voxelColorShader = new FullScreenQuad(new THREE.RawShaderMaterial({
             lights: false,
             uniforms: {

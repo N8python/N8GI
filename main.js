@@ -55,7 +55,6 @@ async function main() {
     directionalLight.shadow.bias = -0.0001;
 
     scene.add(directionalLight);
-
     const loader = new GLTFLoader();
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath("./draco/");

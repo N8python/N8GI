@@ -33,6 +33,9 @@ const VoxelColorShader = {
         #if defined( USE_SHADOWMAP ) && ( NUM_DIR_LIGHT_SHADOWS > 0 )
             uniform mat4 directionalShadowMatrix[ NUM_DIR_LIGHT_SHADOWS ];
         #endif
+        #if ( NUM_SPOT_LIGHT_SHADOWS > 0 )
+            uniform mat4 spotLightMatrix[ NUM_SPOT_LIGHT_SHADOWS ];
+        #endif
         uniform float time;
         uniform sampler2D sceneTex;
         uniform sampler2D sceneDepth;
@@ -257,6 +260,8 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                     vec3(0.0),
                     vec3(0.0)
                 );
+              
+                #if ( NUM_DIR_LIGHTS > 0 )
                 vec3 lightDirection;
                 vec4 shadowCoord;
                 float s, shadow;
@@ -280,6 +285,59 @@ ivec4 sample1Dimi( isampler2D s, int index, int size ) {
                     }
                 }
                 #pragma unroll_loop_end
+                #endif
+
+                #if (NUM_POINT_LIGHTS > 0)
+                PointLight pointLight;
+                IncidentLight directLight;
+                #if defined( USE_SHADOWMAP ) && NUM_POINT_LIGHT_SHADOWS > 0
+                PointLightShadow pointLightShadow;
+                #endif
+                #pragma unroll_loop_start
+                for ( int i = 0; i < NUM_POINT_LIGHTS; i ++ ) {
+
+                    pointLight = pointLights[ i ];
+
+                    getPointLightInfo( pointLight, worldPos, directLight );
+
+                    #if defined( USE_SHADOWMAP ) && ( UNROLLED_LOOP_INDEX < NUM_POINT_LIGHT_SHADOWS )
+                    pointLightShadow = pointLightShadows[ i ];
+                    directLight.color *= ( directLight.visible ) ? getPointShadow( pointShadowMap[ i ], pointLightShadow.shadowMapSize, pointLightShadow.shadowBias, pointLightShadow.shadowRadius, vec4(
+                        worldPos - pointLight.position  , 1.0
+                    ), pointLightShadow.shadowCameraNear, pointLightShadow.shadowCameraFar ) : 1.0;
+                    #endif
+
+                    for (int j = 0; j < 6; j++) {
+                        accumulatedLight[j] += (directLight.color / 3.14159) * sampledTexel.rgb * color * (1.0 - metalness) * max(dot(cardinals[j], directLight.direction), 0.0);
+                    }
+                }
+                #pragma unroll_loop_end            
+                #endif
+
+
+                #if (NUM_SPOT_LIGHTS > 0)
+                SpotLight spotLight;
+                IncidentLight directLight;
+                #if defined( USE_SHADOWMAP ) && NUM_SPOT_LIGHT_SHADOWS > 0
+                SpotLightShadow spotLightShadow;
+                #endif
+                #pragma unroll_loop_start
+                for ( int i = 0; i < NUM_SPOT_LIGHTS; i ++ ) {
+
+                    spotLight = spotLights[ i ];
+
+                    getSpotLightInfo( spotLight, worldPos, directLight );
+
+                    #if defined( USE_SHADOWMAP ) && ( UNROLLED_LOOP_INDEX < NUM_SPOT_LIGHT_SHADOWS )
+                    spotLightShadow = spotLightShadows[ i ];
+                    directLight.color *= ( directLight.visible ) ? getShadow( spotShadowMap[ i ], spotLightShadow.shadowMapSize, spotLightShadow.shadowBias, spotLightShadow.shadowRadius, spotLightMatrix[i] * vec4(worldPos, 1.0) ) : 1.0;
+                    #endif            
+                    for (int j = 0; j < 6; j++) {
+                        accumulatedLight[j] += (directLight.color / 3.14159) * sampledTexel.rgb * color * (1.0 - metalness) * max(dot(cardinals[j], directLight.direction), 0.0);
+                    }
+                }
+                #pragma unroll_loop_end
+                #endif
 
               /*  accumulatedLight += emissive;
                 accumulatedLightBack += emissive;*/

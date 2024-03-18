@@ -313,6 +313,17 @@ class N8GIPass extends Pass {
                 this.camera.matrixWorld
             ));
         });
+        uniforms.pointLights.value.forEach(pointLight => {
+            // console.log(pointLight.position);
+            pointLight.position.applyMatrix4(this.camera.matrixWorld);
+        });
+        uniforms.spotLights.value.forEach(spotLight => {
+            //console.log(spotLight);
+            spotLight.position.applyMatrix4(this.camera.matrixWorld);
+            spotLight.direction.applyMatrix4(new THREE.Matrix4().extractRotation(
+                this.camera.matrixWorld
+            ));
+        });
         Object.keys(uniforms).forEach(key => {
             this.voxelModule.setUniform(key, uniforms[key].value);
         });
