@@ -171,8 +171,9 @@ const _Stats = class _Stats2 {
         if (!this.gl || !this.ext)
             return;
         this.totalGpuDuration = 0;
-        let minStart = Infinity;
-        let maxEnd = -Infinity;
+        //   let minStart = Infinity;
+        //  let maxEnd = -Infinity;
+        let queriesToResolve = [];
         this.gpuQueries.forEach((queryInfo, index) => {
             if (this.gl) {
                 const available = this.gl.getQueryParameter(queryInfo.query, this.gl.QUERY_RESULT_AVAILABLE);
@@ -180,22 +181,35 @@ const _Stats = class _Stats2 {
                 if (available && !disjoint) {
                     const elapsed = this.gl.getQueryParameter(queryInfo.query, this.gl.QUERY_RESULT);
                     const duration = elapsed * 1e-3;
-                    /*  this.totalGpuDuration += duration;*/
                     this.gl.deleteQuery(queryInfo.query);
                     this.gpuQueries.splice(index, 1);
-
-                    if (queryInfo.start < minStart) {
-                        minStart = queryInfo.start;
-                    }
-                    if (queryInfo.start + duration > maxEnd) {
-                        maxEnd = queryInfo.start + duration;
-                    }
+                    queriesToResolve.push({
+                        start: queryInfo.start,
+                        end: queryInfo.start + duration
+                    });
                 }
             }
         });
-        if (this.totalGpuDuration === 0 && Number.isFinite(minStart) && Number.isFinite(maxEnd)) {
-            this.totalGpuDuration = (maxEnd - minStart) * 1e-3;
+        queriesToResolve.sort((a, b) => a.start - b.start);
+        let merged = [];
+        for (let i = 0; i < queriesToResolve.length; i++) {
+            let current = queriesToResolve[i];
+            if (merged.length === 0) {
+                merged.push(current);
+            } else {
+                let last = merged[merged.length - 1];
+                if (current.start <= last.end) {
+                    last.end = Math.max(last.end, current.end);
+                } else {
+                    merged.push(current);
+                }
+            }
         }
+        let total = 0;
+        for (let i = 0; i < merged.length; i++) {
+            total += merged[i].end - merged[i].start;
+        }
+        this.totalGpuDuration = total * 1e-3;
     }
     update() {
         if (this.info === void 0) {

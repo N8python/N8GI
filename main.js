@@ -24,7 +24,7 @@ async function main() {
     document.body.appendChild(renderer.domElement);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.autoUpdate = false;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.VSMShadowMap;
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 25, 0);
     const stats = new Stats({
@@ -51,8 +51,9 @@ async function main() {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 5.0);
     directionalLight.position.set(-150, 450, -150);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 1024;
-    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.radius = 4;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.left = -200;
     directionalLight.shadow.camera.right = 200;
     directionalLight.shadow.camera.top = 200;

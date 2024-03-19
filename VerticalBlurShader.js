@@ -120,7 +120,7 @@ vec3 getWorldPos(float depth, vec2 coord) {
 			}
 			float uvDepth = linearize_depth(d, 0.1, 1000.0);
 			vec3 uvWorldPos = getWorldPos(d, vUv);
-			vec3 normal =  normalize((viewMatrixInv * normalize(vec4(texture2D(normalTexture, vUv).rgb, 0.0))).xyz);
+			vec3 normal =  (viewMatrixInv * (vec4(texture2D(normalTexture, vUv).rgb, 0.0))).xyz;
 			vec4 matData = texture2D(sceneMaterial, vUv);
 			float metalness = matData.r;
 			float roughness = matData.g;

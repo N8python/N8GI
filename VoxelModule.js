@@ -245,6 +245,16 @@ export class VoxelModule {
         });
         fs = fs.replace(`#include <lights_pars_begin>`, THREE.ShaderChunk.lights_pars_begin);
         fs = fs.replace(`#include <shadowmap_pars_fragment>`, THREE.ShaderChunk.shadowmap_pars_fragment);
+        if (this.renderer.shadowMap.enabled) {
+            fs = "#define USE_SHADOWMAP\n" + fs;
+        }
+        if (this.renderer.shadowMap.type === THREE.PCFShadowMap) {
+            fs = "#define SHADOWMAP_TYPE_PCF\n" + fs;
+        } else if (this.renderer.shadowMap.type === THREE.PCFSoftShadowMap) {
+            fs = "#define SHADOWMAP_TYPE_PCF_SOFT\n" + fs;
+        } else if (this.renderer.shadowMap.type === THREE.VSMShadowMap) {
+            fs = "#define SHADOWMAP_TYPE_VSM\n" + fs;
+        }
         fs = fs.replace(/NUM_DIR_LIGHTS/g, lights.filter((light) => light.isDirectionalLight).length);
         fs = fs.replace(/NUM_DIR_LIGHT_SHADOWS/g, lights.filter((light) => light.isDirectionalLight && light.castShadow).length);
         fs = fs.replace(/NUM_POINT_LIGHTS/g, lights.filter((light) => light.isPointLight).length);

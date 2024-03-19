@@ -300,7 +300,7 @@ vec4 getSampleDir(vec3 diskInfo, vec3 normal, vec3 viewDir, vec3 worldPos, float
       vec3 tangent = normalize(cross(normal, helper));
       vec3 bitangent = cross(normal, tangent);
       mat3 TBN = mat3(tangent, bitangent, normal);
-       reflectedDir = normalize(TBN * hemisphereDir);
+       reflectedDir = (TBN * hemisphereDir);
        return vec4(reflectedDir, 0.0);
     } else {
     float alpha = roughness * roughness;
@@ -359,9 +359,9 @@ vec4 takeSample(
       }
       float depth = texture(sceneDepth, vUv).r;
       vec3 worldPos = (viewMatrixInv * vec4(getWorldPos(depth, vUv), 1.0)).xyz;
-      vec3 normal = normalize((viewMatrixInv * vec4(
+      vec3 normal = (viewMatrixInv * vec4(
         texture2D(sceneNormal, vUv).rgb,
-         0.0)).xyz);
+         0.0)).xyz;
 
 
 

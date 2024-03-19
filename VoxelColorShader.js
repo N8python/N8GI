@@ -16,8 +16,6 @@ const VoxelColorShader = {
         }
         `,
     fragmentShader: /*glsl*/ `
-    #define USE_SHADOWMAP
-    #define SHADOWMAP_TYPE_PCF_SOFT
     #define varying in
     #define texture2D texture
     precision highp float;
