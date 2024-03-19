@@ -116,19 +116,19 @@ Stats.Panel = function(name, fg, bg) {
         round = (x) => Math.round(x * 100) / 100
     var PR = round(window.devicePixelRatio || 1);
 
-    var WIDTH = 80 * PR,
+    var WIDTH = 90 * PR,
         HEIGHT = 48 * PR,
         TEXT_X = 3 * PR,
         TEXT_Y = 2 * PR,
         GRAPH_X = 3 * PR,
         GRAPH_Y = 15 * PR,
-        GRAPH_WIDTH = 74 * PR,
+        GRAPH_WIDTH = 84 * PR,
         GRAPH_HEIGHT = 30 * PR;
 
     var canvas = document.createElement('canvas');
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
-    canvas.style.cssText = 'width:80px;height:48px';
+    canvas.style.cssText = 'width:90px;height:48px';
 
     var context = canvas.getContext('2d');
     context.font = 'bold ' + (9 * PR) + 'px Helvetica,Arial,sans-serif';
@@ -144,7 +144,7 @@ Stats.Panel = function(name, fg, bg) {
     context.fillStyle = bg;
     context.globalAlpha = 0.9;
     context.fillRect(GRAPH_X, GRAPH_Y, GRAPH_WIDTH, GRAPH_HEIGHT);
-
+    let runningVal = 0;
     return {
 
         dom: canvas,
@@ -153,14 +153,19 @@ Stats.Panel = function(name, fg, bg) {
 
             min = Math.min(min, value);
             max = Math.max(max, value);
-            min = 0.99 * min + 0.01 * value;
-            max = 0.99 * max + 0.01 * value;
+            min = 0.9 * min + 0.1 * value;
+            max = 0.9 * max + 0.1 * value;
+            if (runningVal == 0) {
+                runningVal = value;
+            } else {
+                runningVal = 0.9 * runningVal + 0.1 * value;
+            }
 
             context.fillStyle = bg;
             context.globalAlpha = 1;
             context.fillRect(0, 0, WIDTH, GRAPH_Y);
             context.fillStyle = fg;
-            context.fillText(round(value) + ' ' + name + ' (' + Math.round(min) + '-' + Math.round(max) + ')', TEXT_X, TEXT_Y);
+            context.fillText(round(runningVal) + ' ' + name + ' (' + Math.round(min) + '-' + Math.round(max) + ')', TEXT_X, TEXT_Y);
 
             context.drawImage(canvas, GRAPH_X + PR, GRAPH_Y, GRAPH_WIDTH - PR, GRAPH_HEIGHT, GRAPH_X, GRAPH_Y, GRAPH_WIDTH - PR, GRAPH_HEIGHT);
 
@@ -168,7 +173,7 @@ Stats.Panel = function(name, fg, bg) {
 
             context.fillStyle = bg;
             context.globalAlpha = 0.9;
-            context.fillRect(GRAPH_X + GRAPH_WIDTH - PR, GRAPH_Y, PR, round((1 - (value / maxValue)) * GRAPH_HEIGHT));
+            context.fillRect(GRAPH_X + GRAPH_WIDTH - PR, GRAPH_Y, PR, round((1 - (value / max)) * GRAPH_HEIGHT));
 
         }
 
