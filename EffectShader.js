@@ -118,9 +118,7 @@ const EffectShader = {
       abs(endPos.z - voxelPos.z));
     
     for(int i = 0; i < maxSteps; i++) {
-      int voxel = texelFetch(voxelTexture, 
-        (voxelPos), 0
-        ).r;
+      int voxel = texelFetch(voxelTexture, voxelPos, 0).r;
        if (voxel >= 0) {
         hit = true;
         break;

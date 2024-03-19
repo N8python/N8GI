@@ -300,6 +300,7 @@ export class VoxelModule {
         /* this.voxelColorShader.material.onBeforeCompile = (shader) => {
              console.log(shader.fragmentShader);
          }*/
+        this.updating = false;
 
     }
 
@@ -313,8 +314,8 @@ export class VoxelModule {
 
     async updateVoxels() {
         this.onBeforeVoxelization();
+        this.updating = true;
         this.indexArray.fill(-1);
-
         for (let i = 0; i < this.children.length; i++) {
             const child = this.children[i];
             child.updateWorldMatrix(false, false);
@@ -389,8 +390,8 @@ export class VoxelModule {
         this.voxelColorShader.render(this.renderer);
 
         this.onAfterVoxelization();
+        this.updating = false;
 
-        requestAnimationFrame(this.updateVoxels.bind(this));
     }
 
     getIndexTexture() {

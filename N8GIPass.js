@@ -272,6 +272,9 @@ class N8GIPass extends Pass {
         this.n8aopass.setSize(width, height);
     }
     render(renderer, writeBuffer, readBuffer, deltaTime, maskActive) {
+        if (!this.voxelModule.updating) {
+            this.voxelModule.updateVoxels();
+        }
         this.voxelModule.voxelColorShader.material.uniforms['sceneTex'].value = this.giTarget.texture;
         this.voxelModule.voxelColorShader.material.uniforms['sceneDepth'].value = this.gbuffer.depthTexture;
         this.voxelModule.voxelColorShader.material.uniforms['projMat'].value = this.camera.projectionMatrix;

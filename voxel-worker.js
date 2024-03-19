@@ -191,30 +191,32 @@ self.onmessage = async(event) => {
             const id = i;
             const positions = positionMap.get(id);
             const indices = indexMap.get(id);
-            const [
-                e0, e1, e2, e3,
-                e4, e5, e6, e7,
-                e8, e9, e10, e11,
-                e12, e13, e14, e15
-            ] = meshMatrixData.slice(id * 16, id * 16 + 16);
+            const matrix = meshMatrixData.slice(id * 16, id * 16 + 16);
+            const e0 = matrix[0];
+            const e1 = matrix[1];
+            const e2 = matrix[2];
+            const e4 = matrix[4];
+            const e5 = matrix[5];
+            const e6 = matrix[6];
+            const e8 = matrix[8];
+            const e9 = matrix[9];
+            const e10 = matrix[10];
+            const e12 = matrix[12];
+            const e13 = matrix[13];
+            const e14 = matrix[14];
+            for (let j = 0, iLen = indices.length; j < iLen; j++) {
+                const index = indices[j] * 3;
+                const x = positions[index];
+                const y = positions[index + 1];
+                const z = positions[index + 2];
 
-            const iLen = indices.length;
-
-            for (let j = 0; j < iLen; j++) {
-                const i = indices[j];
-                const _x = positions[i * 3];
-                const _y = positions[i * 3 + 1];
-                const _z = positions[i * 3 + 2];
-                const x = _x * e0 + _y * e4 + _z * e8 + e12;
-                const y = _x * e1 + _y * e5 + _z * e9 + e13;
-                const z = _x * e2 + _y * e6 + _z * e10 + e14;
-
-                posBufferAux[posBufferCount++] = x;
-                posBufferAux[posBufferCount++] = y;
-                posBufferAux[posBufferCount++] = z;
+                posBufferAux[posBufferCount++] = x * e0 + y * e4 + z * e8 + e12;
+                posBufferAux[posBufferCount++] = x * e1 + y * e5 + z * e9 + e13;
+                posBufferAux[posBufferCount++] = x * e2 + y * e6 + z * e10 + e14;
                 posBufferAux[posBufferCount++] = 1.0;
             }
         }
+
         self.postMessage({ type: "transform", data: { posBufferCount: posBufferCount } });
     }
     if (type === "voxelize") {
