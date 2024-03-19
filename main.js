@@ -8,6 +8,7 @@ import { GLTFLoader } from 'https://unpkg.com/three@0.162.0/examples/jsm/loaders
 import { DRACOLoader } from 'https://unpkg.com/three@0.162.0/examples/jsm/loaders/DRACOLoader.js';
 import { GUI } from 'https://unpkg.com/three@0.162.0/examples/jsm/libs/lil-gui.module.min.js';
 import { Stats } from "./stats.js";
+import SimpleStats from "./statsVoxel.js";
 import { N8GIPass } from './N8GIPass.js';
 
 async function main() {
@@ -36,6 +37,9 @@ async function main() {
     });
     stats.init(renderer);
     document.body.appendChild(stats.dom);
+    const voxelStats = new SimpleStats();
+    voxelStats.showPanel(1);
+    document.body.appendChild(voxelStats.dom);
 
     const environment = new THREE.CubeTextureLoader().load([
         "skybox/Box_Right.bmp",
@@ -179,6 +183,12 @@ async function main() {
 
     const smaaPass = new SMAAPass(clientWidth, clientHeight);
     const n8giPass = new N8GIPass(scene, camera, renderer, clientWidth, clientHeight);
+    n8giPass.voxelModule.onBeforeVoxelization = function() {
+        voxelStats.begin();
+    }
+    n8giPass.voxelModule.onAfterVoxelization = function() {
+        voxelStats.end();
+    }
     composer.addPass(n8giPass);
     composer.addPass(new ShaderPass(GammaCorrectionShader));
     composer.addPass(smaaPass);

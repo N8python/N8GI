@@ -12,6 +12,8 @@ export class VoxelModule {
         this.voxelSize = voxelSize;
         this.workers = [];
         this.workerCount = workers;
+        this.onBeforeVoxelization = function() {};
+        this.onAfterVoxelization = function() {};
     }
 
     init() {
@@ -310,7 +312,7 @@ export class VoxelModule {
     }
 
     async updateVoxels() {
-        console.time("Voxelization: ");
+        this.onBeforeVoxelization();
         this.indexArray.fill(-1);
 
         for (let i = 0; i < this.children.length; i++) {
@@ -386,7 +388,7 @@ export class VoxelModule {
         this.renderer.clear();
         this.voxelColorShader.render(this.renderer);
 
-        console.timeEnd("Voxelization: ");
+        this.onAfterVoxelization();
 
         requestAnimationFrame(this.updateVoxels.bind(this));
     }
